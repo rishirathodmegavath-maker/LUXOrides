@@ -1,25 +1,40 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
-import { MapPreview, SlideToConfirm, StatusToggle } from "../../components";
+import { MapPreview, PhotoCapture, SlideToConfirm, StatusToggle, TextField } from "../../components";
 import { dutyService } from "../../services";
 import { useDutyStore } from "../../store/dutyStore";
+import { captureCurrentLocation } from "../../util/location";
 import { colors, radius, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<DutyStackParamList, "DutyStartMap">;
 
-// Mirrors the Figma "Duty Start Map Page" frame (node 675:11826).
+// Mirrors the Figma "Duty Start Map Page" frame (node 675:11826). The
+// odometer-km field and photo capture are an original addition — the real
+// backend requires both to start a duty (ExternalDriverDutyController),
+// and Figma's version of this screen predates that requirement.
 export function DutyStartMapScreen({ navigation }: Props) {
   const duty = useDutyStore((s) => s.todayDuty);
   const online = useDutyStore((s) => s.online);
   const [starting, setStarting] = useState(false);
+  const [odometerKm, setOdometerKm] = useState("");
+  const [photoUri, setPhotoUri] = useState<string | undefined>();
+  const canStart = !!odometerKm && !!photoUri;
 
   const onStart = async () => {
+    if (!canStart || !photoUri) return;
     setStarting(true);
-    await dutyService.startDuty();
-    navigation.navigate("PickupMap");
+    try {
+      const location = await captureCurrentLocation();
+      await dutyService.startDuty({ odometerKm: Number(odometerKm), photoUri, location });
+      navigation.navigate("PickupMap");
+    } catch (e) {
+      Alert.alert("Couldn't start duty", e instanceof Error ? e.message : "Please try again.");
+    } finally {
+      setStarting(false);
+    }
   };
 
   return (
@@ -44,8 +59,24 @@ export function DutyStartMapScreen({ navigation }: Props) {
           <Text style={styles.address} numberOfLines={2}>{duty?.dropoff.address}</Text>
         </View>
 
+        <TextField
+          label="Odometer Reading (Km)"
+          value={odometerKm}
+          onChangeText={(t) => setOdometerKm(t.replace(/[^0-9]/g, ""))}
+          keyboardType="number-pad"
+          placeholder="e.g. 12450"
+          containerStyle={{ marginTop: spacing.md }}
+        />
+        <View style={{ marginTop: spacing.sm }}>
+          <PhotoCapture uri={photoUri} status="idle" onCapture={setPhotoUri} label="Photo of odometer" compact />
+        </View>
+
         <View style={{ marginTop: spacing.lg }}>
-          <SlideToConfirm label={starting ? "Starting duty…" : "Slide to start the duty"} onConfirm={onStart} disabled={starting} />
+          <SlideToConfirm
+            label={starting ? "Starting duty…" : "Slide to start the duty"}
+            onConfirm={onStart}
+            disabled={starting || !canStart}
+          />
         </View>
       </View>
     </View>

@@ -103,6 +103,31 @@ export interface TripListItem {
   fare?: number;
 }
 
+export interface DutyLocationInput {
+  latitude: number;
+  longitude: number;
+  accuracyMeters?: number;
+  formattedAddress: string;
+}
+
+export interface DutyStartInput {
+  odometerKm: number;
+  photoUri: string;
+  location: DutyLocationInput;
+}
+
+export interface DutyEndInput extends DutyStartInput {
+  expenseAmount?: number;
+}
+
+export interface DutyEndResult {
+  distanceKm: number;
+  durationLabel: string;
+  amountToCollect: number;
+  qrCodeUrl: string | null;
+  paymentLink: string | null;
+}
+
 export interface DutyService {
   getTodayDuty(): Promise<DutySummary | null>;
   getTrips(): Promise<TripListItem[]>;
@@ -111,10 +136,14 @@ export interface DutyService {
   declineDuty(dutyId: string, reason: string): Promise<void>;
   submitReadiness(checklist: ReadinessChecklist): Promise<void>;
   getReadinessStatus(): Promise<"pending" | "submitted" | "approved">;
-  startDuty(): Promise<void>;
+  // Odometer photo + GPS are what the real backend actually requires to
+  // start/end a duty (see FleetovoDutyService) — the mock ignores the
+  // detail and simulates the same outcome.
+  startDuty(input: DutyStartInput): Promise<void>;
   verifyPickupOtp(code: string): Promise<boolean>;
   markArrivedAtDropoff(): Promise<void>;
-  getTripSummary(): Promise<{ distanceKm: number; durationLabel: string }>;
+  endDuty(input: DutyEndInput): Promise<DutyEndResult>;
+  checkPaymentStatus(): Promise<{ paid: boolean; status: string }>;
   returnToGarage(): Promise<void>;
   closeDuty(): Promise<void>;
 }

@@ -1,7 +1,8 @@
 import { dutyApi } from "../../api/duty.api";
-import type { DutySummaryForDriverDTO } from "../../api/duty.types";
+import type { AddressSnapshot, DriverDutyExpenseInput, DutySummaryForDriverDTO } from "../../api/duty.types";
+import { useDutyStore } from "../../store/dutyStore";
 import { MockDutyService } from "../mock/mockDuty";
-import { DutyService, DutySummary, ReadinessChecklist, TripListItem } from "../types";
+import { DutyEndInput, DutyEndResult, DutyService, DutyStartInput, DutySummary, ReadinessChecklist, TripListItem } from "../types";
 
 function money(dto: DutySummaryForDriverDTO): number | undefined {
   return dto.dutyTotal?.amount;
@@ -24,6 +25,24 @@ function toTripListItem(dto: DutySummaryForDriverDTO): TripListItem {
     dropoffAddress: dto.dropLocation ?? "—",
     fare: money(dto),
   };
+}
+
+function toAddressSnapshot(loc: DutyStartInput["location"]): AddressSnapshot {
+  return {
+    formattedAddress: loc.formattedAddress,
+    latitude: loc.latitude,
+    longitude: loc.longitude,
+  };
+}
+
+function formatDuration(startAt: string | null, endAt: string | null): string {
+  if (!startAt || !endAt) return "";
+  const ms = new Date(endAt).getTime() - new Date(startAt).getTime();
+  if (ms <= 0) return "";
+  const totalMinutes = Math.round(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return hours > 0 ? `${hours} Hrs ${minutes} mins` : `${minutes} mins`;
 }
 
 function toDutySummary(dto: DutySummaryForDriverDTO): DutySummary {
@@ -86,8 +105,27 @@ export class FleetovoDutyService implements DutyService {
     return this.mock.getReadinessStatus();
   }
 
-  startDuty(): Promise<void> {
-    return this.mock.startDuty();
+// Odometer photo + GPS location are mandatory on the real endpoints
+  // (ExternalDriverDutyController) — a duty must already be in the
+  // driver's active list (getTodayDuty/getTrips) to have a real dutyId to
+  // mint a token for.
+  async startDuty(input: DutyStartInput): Promise<void> {
+    const todayDuty = useDutyStore.getState().todayDuty;
+    if (!todayDuty) {
+      throw new Error("No active duty to start.");
+    }
+    const { token } = await dutyApi.issueExecutionToken(todayDuty.id);
+    useDutyStore.getState().setExecutionToken(token);
+    await dutyApi.submitStart(
+      token,
+      {
+        odometerKm: input.odometerKm,
+        location: toAddressSnapshot(input.location),
+        accuracyMeters: input.location.accuracyMeters ?? null,
+        locationCapturedAt: new Date().toISOString(),
+      },
+      { uri: input.photoUri, name: "odometer-start.jpg", type: "image/jpeg" }
+    );
   }
 
   verifyPickupOtp(code: string): Promise<boolean> {
@@ -98,8 +136,40 @@ export class FleetovoDutyService implements DutyService {
     return this.mock.markArrivedAtDropoff();
   }
 
-  getTripSummary(): Promise<{ distanceKm: number; durationLabel: string }> {
-    return this.mock.getTripSummary();
+  async endDuty(input: DutyEndInput): Promise<DutyEndResult> {
+    const token = useDutyStore.getState().executionToken;
+    if (!token) {
+      throw new Error("Duty was never started — nothing to end.");
+    }
+    const extraCharges: DriverDutyExpenseInput[] =
+      input.expenseAmount && input.expenseAmount > 0
+        ? [{ type: "OTHER", amount: input.expenseAmount, description: "Additional charges" }]
+        : [];
+    const res = await dutyApi.submitEnd(
+      token,
+      {
+        odometerKm: input.odometerKm,
+        location: toAddressSnapshot(input.location),
+        accuracyMeters: input.location.accuracyMeters ?? null,
+        locationCapturedAt: new Date().toISOString(),
+        extraCharges,
+      },
+      { uri: input.photoUri, name: "odometer-end.jpg", type: "image/jpeg" }
+    );
+    return {
+      distanceKm: res.summary.totalKm ?? res.summary.actualDrivenKm ?? 0,
+      durationLabel: formatDuration(res.summary.startAt, res.summary.endAt),
+      amountToCollect: res.paymentInstruction.amount,
+      qrCodeUrl: res.paymentInstruction.qrCodeUrl,
+      paymentLink: res.paymentInstruction.paymentLink,
+    };
+  }
+
+  async checkPaymentStatus(): Promise<{ paid: boolean; status: string }> {
+    const token = useDutyStore.getState().executionToken;
+    if (!token) return { paid: false, status: "NOT_CREATED" };
+    const res = await dutyApi.checkQrPaymentStatus(token);
+    return { paid: res.paid, status: res.status };
   }
 
   returnToGarage(): Promise<void> {

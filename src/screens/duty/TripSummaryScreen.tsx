@@ -1,21 +1,19 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
 import { Button, Card, ScreenContainer, ScreenHeader } from "../../components";
-import { dutyService } from "../../services";
+import { useDutyStore } from "../../store/dutyStore";
 import { colors, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<DutyStackParamList, "TripSummary">;
 
-// Mirrors the Figma "Trip Summary" frame (node 675:11397).
+// Mirrors the Figma "Trip Summary" frame (node 675:11397). distanceKm/
+// durationLabel come from endDuty's real result (DropOffScreen), stored in
+// dutyStore rather than a separate fetch.
 export function TripSummaryScreen({ navigation }: Props) {
-  const [summary, setSummary] = useState<{ distanceKm: number; durationLabel: string } | null>(null);
-
-  useEffect(() => {
-    dutyService.getTripSummary().then(setSummary);
-  }, []);
+  const summary = useDutyStore((s) => s.dutyEndResult);
 
   return (
     <ScreenContainer footer={<Button label="Proceed to Payment" onPress={() => navigation.navigate("PaymentBilling")} />}>

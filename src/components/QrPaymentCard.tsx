@@ -1,27 +1,28 @@
-import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import React from "react";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { paymentService } from "../services";
 import { colors, radius, spacing, type } from "../theme";
 import { Button } from "./Button";
 
+export interface QrPaymentCardProps {
+  qrCodeUrl?: string | null;
+  amount?: number | null;
+  paid?: boolean;
+}
+
 // Mirrors the payment QR panel seen in the Figma side-drawer / payment
-// flow: LuxoRides UPI identity, a QR block, and a "Share QR Code" action.
-// A real QR image isn't rendered (no QR-generation lib in Phase 1 scope);
-// the bordered placeholder communicates the same layout.
-export function QrPaymentCard() {
-  const [upiId, setUpiId] = useState("");
-
-  useEffect(() => {
-    paymentService.getQrPaymentInfo().then((info) => setUpiId(info.upiId));
-  }, []);
-
+// flow: LuxoRides identity, a QR block, and a "Share QR Code" action. When
+// a real qrCodeUrl is available (from endDuty's PaymentInstruction) it
+// renders that image; otherwise falls back to the placeholder frame.
+export function QrPaymentCard({ qrCodeUrl, amount, paid }: QrPaymentCardProps) {
   return (
     <View>
-      <View style={styles.notice}>
+      <View style={[styles.notice, paid && styles.noticePaid]}>
         <Feather name="shield" size={18} color={colors.successStrong} />
         <Text style={styles.noticeText}>
-          Payments are made directly to LuxoRides. Chauffeurs do not collect or receive client payments.
+          {paid
+            ? "Payment received — thank you."
+            : "Payments are made directly to LuxoRides. Chauffeurs do not collect or receive client payments."}
         </Text>
       </View>
 
@@ -31,12 +32,16 @@ export function QrPaymentCard() {
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.upiTitle}>LuxoRides Payment</Text>
-          <Text style={styles.upiId}>UPI ID: {upiId}</Text>
+          {amount != null ? <Text style={styles.upiId}>Amount: ₹{amount.toLocaleString("en-IN")}</Text> : null}
         </View>
       </View>
 
       <View style={styles.qrFrame}>
-        <Feather name="grid" size={140} color={colors.primary} />
+        {qrCodeUrl ? (
+          <Image source={{ uri: qrCodeUrl }} style={styles.qrImage} resizeMode="contain" />
+        ) : (
+          <Feather name="grid" size={140} color={colors.primary} />
+        )}
       </View>
       <Text style={styles.qrCaption}>Ask the client to scan this QR code and complete the payment.</Text>
 
@@ -54,6 +59,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
+  noticePaid: { backgroundColor: colors.successBg },
   noticeText: { ...type.body2, color: colors.successStrong, flex: 1 },
   upiRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginBottom: spacing.lg },
   upiIcon: {
@@ -74,6 +80,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: spacing.md,
+    overflow: "hidden",
   },
+  qrImage: { width: "100%", height: "100%" },
   qrCaption: { ...type.body2, color: colors.textSecondary, textAlign: "center", marginBottom: spacing.lg },
 });

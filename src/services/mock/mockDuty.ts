@@ -1,4 +1,4 @@
-import { DutyService, DutySummary, ReadinessChecklist, TripListItem } from "../types";
+import { DutyEndInput, DutyEndResult, DutyService, DutyStartInput, DutySummary, ReadinessChecklist, TripListItem } from "../types";
 import { delay } from "./utils";
 
 const TRIPS: TripListItem[] = [
@@ -96,7 +96,7 @@ export class MockDutyService implements DutyService {
     return delay(this.readiness, 200);
   }
 
-  async startDuty(): Promise<void> {
+  async startDuty(_input: DutyStartInput): Promise<void> {
     await delay(null, 500);
   }
 
@@ -109,8 +109,15 @@ export class MockDutyService implements DutyService {
     await delay(null, 500);
   }
 
-  async getTripSummary(): Promise<{ distanceKm: number; durationLabel: string }> {
-    return delay({ distanceKm: 57.5, durationLabel: "3 Hrs 30 mins" }, 400);
+  async endDuty(_input: DutyEndInput): Promise<DutyEndResult> {
+    return delay(
+      { distanceKm: 57.5, durationLabel: "3 Hrs 30 mins", amountToCollect: 4200, qrCodeUrl: null, paymentLink: null },
+      600
+    );
+  }
+
+  async checkPaymentStatus(): Promise<{ paid: boolean; status: string }> {
+    return delay({ paid: true, status: "PAID" }, 800);
   }
 
   async returnToGarage(): Promise<void> {

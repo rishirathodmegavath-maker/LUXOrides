@@ -78,10 +78,12 @@ export function HomeScreen({ navigation }: Props) {
         {online && todayDuty ? (
           <Card style={{ marginTop: spacing.xl }}>
             <View style={styles.dutyTopRow}>
-              <Chip label="Today's Duty" tone="success" icon={<View style={styles.dot} />} />
-              <Chip label={todayDuty.type} tone="info" icon={<Feather name="briefcase" size={12} color={colors.info} />} />
+              <View style={styles.dutyChipsRow}>
+                <Chip label="Today's Duty" tone="success" icon={<View style={styles.dot} />} />
+                <Chip label={todayDuty.type} tone="info" icon={<Feather name="briefcase" size={12} color={colors.info} />} />
+              </View>
+              <Text style={styles.durationLabel}>{todayDuty.durationLabel}</Text>
             </View>
-            <Text style={styles.durationLabel}>{todayDuty.durationLabel}</Text>
             <Text style={styles.reportTime}>
               {todayDuty.reportTime} <Text style={styles.reportSub}>AM</Text>
             </Text>
@@ -159,9 +161,10 @@ const styles = StyleSheet.create({
   greeting: { ...type.body1, color: colors.textSecondary },
   headline: { ...type.h1, color: colors.textPrimary, marginTop: spacing.xxs },
   subtitle: { ...type.body1, color: colors.textSecondary, marginTop: spacing.xxs },
-  dutyTopRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
+  dutyTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  dutyChipsRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center", flexShrink: 1 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
-  durationLabel: { ...type.body2, color: colors.textSecondary, textAlign: "right", marginTop: -20 },
+  durationLabel: { ...type.body2, color: colors.textSecondary, textAlign: "right", marginLeft: spacing.sm, flexShrink: 0 },
   reportTime: { ...type.display, color: colors.textPrimary, marginTop: spacing.sm },
   reportSub: { ...type.h4, color: colors.textSecondary },
   reportBy: { ...type.label, color: colors.success, marginTop: -4 },
@@ -172,7 +175,7 @@ const styles = StyleSheet.create({
   stopKm: { ...type.h4, color: colors.textPrimary },
   stopMin: { ...type.body3, color: colors.textSecondary },
   ctaRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.xl },
-  emptyWrap: { alignItems: "center" },
+  emptyWrap: { alignItems: "stretch" },
   emptyRow: { flexDirection: "row", gap: spacing.sm, alignItems: "flex-start" },
   emptyTitle: { ...type.h4, color: colors.textPrimary, marginTop: spacing.lg, textAlign: "center" },
   emptyBody: { ...type.body2, color: colors.textSecondary, marginTop: spacing.xxs },

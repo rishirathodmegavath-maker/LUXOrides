@@ -1,5 +1,5 @@
 import React from "react";
-import { ScrollView, StyleSheet, View, ViewStyle } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, ViewStyle } from "react-native";
 import { SafeAreaView, Edge } from "react-native-safe-area-context";
 import { colors, screenPadding } from "../theme";
 
@@ -29,8 +29,14 @@ export function ScreenContainer({
 
   return (
     <SafeAreaView edges={edges} style={[styles.safeArea, { backgroundColor }]}>
-      <Body {...bodyProps}>{children}</Body>
-      {footer ? <View style={styles.footer}>{footer}</View> : null}
+      <KeyboardAvoidingView
+        style={styles.safeArea}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : -24}
+      >
+        <Body {...bodyProps}>{children}</Body>
+        {footer ? <View style={styles.footer}>{footer}</View> : null}
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

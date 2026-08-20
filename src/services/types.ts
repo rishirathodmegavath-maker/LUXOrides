@@ -107,6 +107,8 @@ export interface DutyService {
   getTodayDuty(): Promise<DutySummary | null>;
   getTrips(): Promise<TripListItem[]>;
   getTripById(id: string): Promise<TripListItem | null>;
+  acceptDuty(dutyId: string): Promise<void>;
+  declineDuty(dutyId: string, reason: string): Promise<void>;
   submitReadiness(checklist: ReadinessChecklist): Promise<void>;
   getReadinessStatus(): Promise<"pending" | "submitted" | "approved">;
   startDuty(): Promise<void>;

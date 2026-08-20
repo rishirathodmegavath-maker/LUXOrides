@@ -1,6 +1,8 @@
 import React from "react";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "./types";
+import { AcceptDutyScreen } from "../screens/duty/AcceptDutyScreen";
+import { DeclineDutyScreen } from "../screens/duty/DeclineDutyScreen";
 import { UniformSelfieScreen } from "../screens/duty/UniformSelfieScreen";
 import { VehicleExteriorScreen } from "../screens/duty/VehicleExteriorScreen";
 import { VehicleInteriorScreen } from "../screens/duty/VehicleInteriorScreen";
@@ -25,7 +27,9 @@ const Stack = createNativeStackNavigator<DutyStackParamList>();
 
 export function DutyNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="UniformSelfie">
+    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="AcceptDuty">
+      <Stack.Screen name="AcceptDuty" component={AcceptDutyScreen} />
+      <Stack.Screen name="DeclineDuty" component={DeclineDutyScreen} />
       <Stack.Screen name="UniformSelfie" component={UniformSelfieScreen} />
       <Stack.Screen name="VehicleExterior" component={VehicleExteriorScreen} />
       <Stack.Screen name="VehicleInterior" component={VehicleInteriorScreen} />

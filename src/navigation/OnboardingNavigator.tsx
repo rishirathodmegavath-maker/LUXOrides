@@ -10,6 +10,7 @@ import { GarageLocationScreen } from "../screens/onboarding/GarageLocationScreen
 import { PrivacyTermsScreen } from "../screens/onboarding/PrivacyTermsScreen";
 import { ProfilePhotoScreen } from "../screens/onboarding/ProfilePhotoScreen";
 import { AlmostReadyScreen } from "../screens/onboarding/AlmostReadyScreen";
+import { NotApprovedScreen } from "../screens/onboarding/NotApprovedScreen";
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
 
@@ -29,6 +30,7 @@ export function OnboardingNavigator() {
       <Stack.Screen name="GarageLocation" component={GarageLocationScreen} />
       <Stack.Screen name="ProfilePhoto" component={ProfilePhotoScreen} />
       <Stack.Screen name="AlmostReady" component={AlmostReadyScreen} />
+      <Stack.Screen name="NotApproved" component={NotApprovedScreen} />
     </Stack.Navigator>
   );
 }

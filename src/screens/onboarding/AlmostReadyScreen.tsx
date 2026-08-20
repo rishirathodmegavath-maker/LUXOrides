@@ -13,7 +13,7 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, "AlmostReady">;
 // Mirrors the Figma "Almost Ready Account" frame (node 671:9772). Once the
 // mock approval resolves, RootNavigator automatically switches to the main
 // app (see App.tsx gating on useAuthStore approvalStatus).
-export function AlmostReadyScreen(_props: Props) {
+export function AlmostReadyScreen({ navigation }: Props) {
   const [approving, setApproving] = useState(true);
   const setApprovalStatus = useAuthStore((s) => s.setApprovalStatus);
 
@@ -22,8 +22,14 @@ export function AlmostReadyScreen(_props: Props) {
       const status = await onboardingService.getApprovalStatus();
       setApprovalStatus(status);
       setApproving(false);
+      // "approved" is picked up by RootNavigator's gating (it swaps away
+      // from this whole stack automatically). "rejected" isn't — this
+      // stack stays mounted, so it needs an explicit navigate.
+      if (status === "rejected") {
+        navigation.replace("NotApproved");
+      }
     });
-  }, [setApprovalStatus]);
+  }, [setApprovalStatus, navigation]);
 
   return (
     <ScreenContainer style={styles.wrap}>

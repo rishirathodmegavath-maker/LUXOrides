@@ -112,7 +112,7 @@ export function HomeScreen({ navigation }: Props) {
 
             <View style={styles.ctaRow}>
               <Button label="Trip Details" variant="secondary" style={{ flex: 1 }} onPress={() => navigation.navigate("TripDetails", { dutyId: todayDuty.id })} />
-              <Button label="Start Duty" style={{ flex: 1 }} onPress={() => navigation.navigate("Duty", { screen: "UniformSelfie" })} />
+              <Button label="Start Duty" style={{ flex: 1 }} onPress={() => navigation.navigate("Duty", { screen: "AcceptDuty" })} />
             </View>
           </Card>
         ) : (

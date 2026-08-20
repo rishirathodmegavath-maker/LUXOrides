@@ -78,6 +78,14 @@ export class MockDutyService implements DutyService {
     return delay(TRIPS.find((t) => t.id === id) ?? null, 300);
   }
 
+  async acceptDuty(_dutyId: string): Promise<void> {
+    await delay(null, 400);
+  }
+
+  async declineDuty(_dutyId: string, _reason: string): Promise<void> {
+    await delay(null, 600);
+  }
+
   async submitReadiness(_checklist: ReadinessChecklist): Promise<void> {
     this.readiness = "submitted";
     await delay(null, 900);

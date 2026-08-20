@@ -36,7 +36,9 @@ export class MockOnboardingService implements OnboardingService {
   async submitForApproval(): Promise<void> {
     this.approval = "pending";
     await delay(null, 800);
-    this.approval = "approved";
+    // Occasionally rejects so the "Not Approved" status screen is reachable
+    // during a normal walkthrough, mirroring the uploadDocument failure demo.
+    this.approval = Math.random() < 0.2 ? "rejected" : "approved";
   }
 
   async getApprovalStatus(): Promise<DriverProfile["approvalStatus"]> {

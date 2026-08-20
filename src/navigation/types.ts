@@ -24,6 +24,7 @@ export type OnboardingStackParamList = {
   PrivacyTerms: undefined;
   ProfilePhoto: undefined;
   AlmostReady: undefined;
+  NotApproved: undefined;
 };
 
 export type MainTabParamList = {
@@ -34,6 +35,8 @@ export type MainTabParamList = {
 };
 
 export type DutyStackParamList = {
+  AcceptDuty: undefined;
+  DeclineDuty: undefined;
   UniformSelfie: undefined;
   VehicleExterior: undefined;
   VehicleInterior: undefined;

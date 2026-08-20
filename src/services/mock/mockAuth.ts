@@ -27,4 +27,9 @@ export class MockAuthService implements AuthService {
   async logout(): Promise<void> {
     await delay(null, 300);
   }
+
+  async restoreSession(): Promise<Session | null> {
+    // Mock mode has no persistence — every app launch starts logged out.
+    return null;
+  }
 }

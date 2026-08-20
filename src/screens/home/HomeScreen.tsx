@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { DrawerActions, useFocusEffect } from "@react-navigation/native";
@@ -7,7 +7,7 @@ import type { CompositeScreenProps } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../navigation/types";
 import { Button, Card, Chip, StatusToggle } from "../../components";
-import { dutyService } from "../../services";
+import { driverService, dutyService } from "../../services";
 import { useDutyStore } from "../../store/dutyStore";
 import { colors, spacing, type } from "../../theme";
 
@@ -34,6 +34,15 @@ export function HomeScreen({ navigation }: Props) {
   const setOnline = useDutyStore((s) => s.setOnline);
   const todayDuty = useDutyStore((s) => s.todayDuty);
   const setTodayDuty = useDutyStore((s) => s.setTodayDuty);
+  const [driverName, setDriverName] = React.useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    driverService.getProfile().then((p) => active && setDriverName(p.name));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -60,7 +69,7 @@ export function HomeScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.body}>
-        <Text style={styles.greeting}>{greeting()}, Raja</Text>
+        <Text style={styles.greeting}>{greeting()}{driverName ? `, ${driverName}` : ""}</Text>
         <Text style={styles.headline}>{online ? "You're Online" : "You're Offline"}</Text>
         <Text style={styles.subtitle}>
           {online ? "Go offline when you're ready to end your duty." : "Go online when you're ready to start your duty."}

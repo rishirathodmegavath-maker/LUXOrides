@@ -58,7 +58,8 @@
         {
           "locationWhenInUsePermission": "LuxoRides Chauffeur uses your location to navigate to pickups and track active duties."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

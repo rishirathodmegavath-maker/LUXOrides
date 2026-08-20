@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
@@ -10,6 +10,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { NavigationContainer } from "@react-navigation/native";
 import { RootNavigator } from "./src/navigation/RootNavigator";
+import { authService } from "./src/services";
+import { useAuthStore } from "./src/store/authStore";
 import { colors } from "./src/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -27,17 +29,36 @@ export default function App() {
     PlayfairDisplay_600SemiBold_Italic,
   });
 
+  // Resume a previously-verified session (stored token → GET /me) once at
+  // launch, before the first screen ever renders, so a returning driver
+  // never sees a flash of the login screen.
+  const [authReady, setAuthReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    authService
+      .restoreSession()
+      .then((session) => {
+        if (active && session) useAuthStore.getState().setSession(session);
+      })
+      .finally(() => {
+        if (active) setAuthReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const onLayoutRootView = useCallback(async () => {
-    if (fontsLoaded || fontError) {
+    if ((fontsLoaded || fontError) && authReady) {
       await SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, authReady]);
 
   useEffect(() => {
     onLayoutRootView();
   }, [onLayoutRootView]);
 
-  if (!fontsLoaded && !fontError) {
+  if ((!fontsLoaded && !fontError) || !authReady) {
     return null;
   }
 

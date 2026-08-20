@@ -22,6 +22,10 @@ export interface AuthService {
   verifyOtp(phone: string, code: string): Promise<Session>;
   resendOtp(phone: string): Promise<OtpResult>;
   logout(): Promise<void>;
+  // Called once at app launch to silently resume a previously-verified
+  // session (e.g. from a stored token) without requiring OTP again. Returns
+  // null if there is nothing to resume.
+  restoreSession(): Promise<Session | null>;
 }
 
 export interface DriverProfile {

@@ -31,7 +31,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   grid: {
-    ...StyleSheet.absoluteFill,
+    ...StyleSheet.absoluteFillObject,
     borderColor: colors.slate[200],
     borderWidth: 1,
     opacity: 0.6,

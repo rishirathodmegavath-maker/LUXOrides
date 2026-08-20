@@ -37,7 +37,6 @@
     },
     "plugins": [
       "expo-font",
-      "expo-image",
       "expo-dev-client",
       [
         "expo-splash-screen",

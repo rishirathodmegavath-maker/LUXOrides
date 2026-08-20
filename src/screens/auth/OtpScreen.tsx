@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../../navigation/types";
 import { Button, OtpField, ScreenContainer, ScreenHeader } from "../../components";
@@ -35,9 +35,10 @@ export function OtpScreen({ route, navigation }: Props) {
     try {
       const session = await authService.verifyOtp(phone, code);
       setVerified(true);
-      // RootNavigator switches stacks automatically once the session is set
-      // (see App root navigator gating on useAuthStore).
-      setTimeout(() => setSession(session), 700);
+      // Let the OtpField merge-into-checkmark animation play out before
+      // RootNavigator switches stacks (it does so automatically once the
+      // session is set — see the root navigator gating on useAuthStore).
+      setTimeout(() => setSession(session), 1500);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Verification failed");
     } finally {
@@ -50,37 +51,42 @@ export function OtpScreen({ route, navigation }: Props) {
     setSeconds(45);
   };
 
-  if (verified) {
-    return (
-      <ScreenContainer style={styles.successWrap}>
-        <Feather name="check-circle" size={72} color={colors.success} />
-        <Text style={styles.successTitle}>Verified!</Text>
-      </ScreenContainer>
-    );
-  }
-
   return (
     <ScreenContainer
       footer={
-        <Button label="Verify" onPress={onVerify} disabled={code.length < 6} loading={verifying} />
+        verified ? undefined : (
+          <Button label="Verify" onPress={onVerify} disabled={code.length < 6} loading={verifying} />
+        )
       }
     >
       <ScreenHeader onBack={() => navigation.goBack()} />
-      <Text style={styles.title}>Enter verification code</Text>
-      <Text style={styles.subtitle}>Enter the 6-digit code we sent to</Text>
-      <Text style={styles.phone}>+91 {phone}</Text>
+
+      {verified ? (
+        <Animated.View key="verified" entering={FadeIn.duration(250)} exiting={FadeOut.duration(150)}>
+          <Text style={styles.title}>Verified successfully</Text>
+          <Text style={styles.subtitle}>Your phone number has been verified.</Text>
+        </Animated.View>
+      ) : (
+        <Animated.View key="unverified" entering={FadeIn.duration(250)} exiting={FadeOut.duration(150)}>
+          <Text style={styles.title}>Enter verification code</Text>
+          <Text style={styles.subtitle}>Enter the 6-digit code we sent to</Text>
+          <Text style={styles.phone}>+91 {phone}</Text>
+        </Animated.View>
+      )}
 
       <ScreenContainer padded={false} scroll={false} style={{ marginTop: spacing.xl }}>
-        <OtpField length={6} value={code} onChange={setCode} errorText={error} autoFocus />
+        <OtpField length={6} value={code} onChange={setCode} errorText={error} autoFocus success={verified} />
       </ScreenContainer>
 
-      <Text style={styles.resendRow}>
-        {seconds > 0 ? (
-          <>Didn&apos;t receive the code? <Text style={styles.bold}>Resend in {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}.</Text></>
-        ) : (
-          <Text style={styles.link} onPress={onResend}>Resend code</Text>
-        )}
-      </Text>
+      {verified ? null : (
+        <Text style={styles.resendRow}>
+          {seconds > 0 ? (
+            <>Didn&apos;t receive the code? <Text style={styles.bold}>Resend in {String(Math.floor(seconds / 60)).padStart(2, "0")}:{String(seconds % 60).padStart(2, "0")}.</Text></>
+          ) : (
+            <Text style={styles.link} onPress={onResend}>Resend code</Text>
+          )}
+        </Text>
+      )}
     </ScreenContainer>
   );
 }
@@ -92,6 +98,4 @@ const styles = StyleSheet.create({
   resendRow: { ...type.body2, color: colors.textSecondary, marginTop: spacing.lg },
   bold: { fontFamily: type.label.fontFamily, color: colors.textPrimary },
   link: { color: colors.info, fontFamily: type.label.fontFamily },
-  successWrap: { alignItems: "center", justifyContent: "center", gap: spacing.md },
-  successTitle: { ...type.h2, color: colors.textPrimary },
 });

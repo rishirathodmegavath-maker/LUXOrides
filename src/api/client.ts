@@ -31,7 +31,10 @@ async function parseError(res: Response): Promise<never> {
 
 async function request<T>(path: string, init: RequestInit, authenticated: boolean): Promise<T> {
   const headers = new Headers(init.headers);
-  if (init.body !== undefined) {
+  // FormData bodies need fetch to set their own multipart boundary header —
+  // forcing application/json here would break the /driver-api/duty/*
+  // multipart submissions.
+  if (init.body !== undefined && !(init.body instanceof FormData)) {
     headers.set("Content-Type", "application/json");
   }
 
@@ -80,4 +83,39 @@ export const publicApi = {
 /** For endpoints requiring the driver's own Bearer JWT. */
 export const privateApi = {
   get: <T>(path: string) => request<T>(path, { method: "GET" }, true),
+  post: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined }, true),
+};
+
+export interface FilePart {
+  uri: string;
+  name: string;
+  type: string;
+}
+
+/**
+ * For the token-authenticated /driver-api/duty/{token}/** family — the
+ * opaque per-duty token in the URL path IS the credential, no Bearer
+ * header (see ExternalDriverDutyController, permitAll + @CrossOrigin("*")).
+ */
+export const tokenApi = {
+  get: <T>(path: string) => request<T>(path, { method: "GET" }, false),
+  postMultipart: <T>(path: string, payload: unknown, files: Record<string, FilePart | FilePart[]>) => {
+    const form = new FormData();
+    // @RequestPart binds this part via Jackson, which requires an explicit
+    // application/json content-type on the part itself — React Native's
+    // FormData supports that via the {string, type} form (not a browser
+    // Blob, but RN's own documented FormData extension).
+    form.append(
+      "payload",
+      { string: JSON.stringify(payload), type: "application/json" } as unknown as string
+    );
+    for (const [key, value] of Object.entries(files)) {
+      const parts = Array.isArray(value) ? value : [value];
+      for (const part of parts) {
+        form.append(key, part as unknown as Blob);
+      }
+    }
+    return request<T>(path, { method: "POST", body: form }, false);
+  },
 };

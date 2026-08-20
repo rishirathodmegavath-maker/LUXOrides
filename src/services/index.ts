@@ -1,9 +1,9 @@
 import { MockOnboardingService } from "./mock/mockOnboarding";
-import { MockDutyService } from "./mock/mockDuty";
 import { MockPaymentService } from "./mock/mockPayment";
 import { MockSupportService } from "./mock/mockSupport";
 import { FleetovoAuthService } from "./real/FleetovoAuthService";
 import { FleetovoDriverService } from "./real/FleetovoDriverService";
+import { FleetovoDutyService } from "./real/FleetovoDutyService";
 import {
   AuthService,
   DriverServiceApi,
@@ -23,7 +23,10 @@ import {
 export const authService: AuthService = new FleetovoAuthService();
 export const driverService: DriverServiceApi = new FleetovoDriverService();
 export const onboardingService: OnboardingService = new MockOnboardingService();
-export const dutyService: DutyService = new MockDutyService();
+// Duty list/detail (getTodayDuty/getTrips/getTripById) call the real
+// backend; readiness/accept-decline/pickup-OTP/start/end still delegate to
+// the mock internally — see FleetovoDutyService's own comment.
+export const dutyService: DutyService = new FleetovoDutyService();
 export const paymentService: PaymentService = new MockPaymentService();
 export const supportService: SupportService = new MockSupportService();
 

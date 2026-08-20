@@ -1,17 +1,26 @@
 {
   "expo": {
-    "name": "LuxoRidesChauffeurApp",
-    "slug": "LuxoRidesChauffeurApp",
+    "name": "LuxoRides Chauffeur",
+    "slug": "luxorides-chauffeur",
+    "scheme": "luxorideschauffeur",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#003142",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#003142"
+    },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.luxorides.chauffeur"
     },
     "android": {
+      "package": "com.luxorides.chauffeur",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#003142",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -20,6 +29,32 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-font",
+      "expo-image",
+      "expo-dev-client",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#003142"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "LuxoRides Chauffeur uses your photos to upload identity documents and vehicle checklist photos.",
+          "cameraPermission": "LuxoRides Chauffeur uses your camera to capture your uniform selfie, vehicle checklist, and identity documents."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "LuxoRides Chauffeur uses your location to navigate to pickups and track active duties."
+        }
+      ]
+    ]
   }
 }

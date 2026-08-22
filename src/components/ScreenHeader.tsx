@@ -42,6 +42,8 @@ export function Chip({ label, tone = "neutral", icon }: { label: string; tone?: 
           tone === "success" && { color: colors.successStrong },
           tone === "info" && { color: colors.info },
         ]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
       >
         {label}
       </Text>
@@ -71,6 +73,7 @@ const chipStyles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: colors.slate[100],
     alignSelf: "flex-start",
+    flexShrink: 1,
   },
-  label: { ...type.caption, fontFamily: type.label.fontFamily, color: colors.textSecondary },
+  label: { ...type.caption, fontFamily: type.label.fontFamily, color: colors.textSecondary, flexShrink: 1 },
 });

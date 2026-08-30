@@ -58,8 +58,12 @@ export type DutyStatus = "assigned" | "readiness" | "enRouteToPickup" | "waiting
 export interface TripStop {
   label: string;
   address: string;
-  distanceKm: number;
-  etaMinutes: number;
+  // null on the real backend path: DutySummaryForDriverDTO has no live
+  // routing figures for pickup/drop legs (only the drop->garage return leg,
+  // computed at duty end, carries real distance/route data). The mock path
+  // still provides plausible demo numbers here.
+  distanceKm: number | null;
+  etaMinutes: number | null;
 }
 
 export interface DutySummary {
@@ -120,12 +124,63 @@ export interface DutyEndInput extends DutyStartInput {
   expenseAmount?: number;
 }
 
+export interface GeoPoint {
+  lat: number;
+  lng: number;
+}
+
+// The drop -> garage return leg Fleetovo actually calculated for this duty
+// (com.core.dtos.driverduty.ReturnRouteEstimate) -- real road geometry when
+// available, null when the backend has none. Never a client-computed route.
+export interface ReturnRoute {
+  distanceKm: number;
+  durationSeconds: number;
+  routeAvailable: boolean;
+  dropLocation: GeoPoint | null;
+  garageLocation: GeoPoint | null;
+  geometry: GeoPoint[] | null;
+}
+
+// The package/rate-card breakdown behind the final amount
+// (com.core.dtos.driverduty.PackageFareBreakdown) -- base fare, included km/time, and
+// whatever extra km/time actually got charged, all backend-computed. Never recalculated
+// on-device; this is purely what to display.
+export interface FareBreakdown {
+  dutyTypeLabel: string | null;
+  packageUnit: string | null;
+  includedDistanceKm: number | null;
+  includedTimeUnits: number | null;
+  baseFareAmount: number | null;
+  extraDistanceKm: number;
+  extraDistanceRatePerKm: number | null;
+  extraDistanceCharge: number;
+  extraTimeHours: number;
+  extraTimeRatePerHour: number | null;
+  extraTimeCharge: number;
+  projectedTotalDurationSeconds: number | null;
+}
+
 export interface DutyEndResult {
   distanceKm: number;
   durationLabel: string;
   amountToCollect: number;
   qrCodeUrl: string | null;
   paymentLink: string | null;
+  returnRoute: ReturnRoute | null;
+  // Additive fields backing the "Final Fare" breakdown screen -- actualDrivenKm/
+  // projectedTotalKm/expensesTotal/fareBreakdown are all real, backend-computed figures
+  // (com.core.dtos.driverduty.DutyCompletionSummary). Optional so the mock duty-service
+  // path (which has no package/rate-card data to draw from) can omit them without lying
+  // about numbers it doesn't have.
+  actualDrivenKm?: number | null;
+  projectedTotalKm?: number | null;
+  expensesTotal?: number;
+  fareBreakdown?: FareBreakdown | null;
+  // Already folded into amountToCollect by the backend (BookingUtil.calculateTotalAmount) --
+  // shown only when non-zero so the breakdown rows visibly account for the full final
+  // amount on a GST-registered org, without cluttering the (today, default) exempt case.
+  gstAmount?: number | null;
+  gstRatePercent?: number | null;
 }
 
 export interface DutyService {
@@ -140,11 +195,22 @@ export interface DutyService {
   // start/end a duty (see FleetovoDutyService) — the mock ignores the
   // detail and simulates the same outcome.
   startDuty(input: DutyStartInput): Promise<void>;
-  verifyPickupOtp(code: string): Promise<boolean>;
+  // Generates/resends the real, server-verified pickup OTP (SMS'd to the
+  // customer on the booking). Throws with a real backend message if the
+  // duty isn't running yet or the customer phone is unavailable.
+  requestPickupOtp(): Promise<void>;
+  // Throws (ApiError with a real backend message: incorrect code, expired,
+  // too many attempts) rather than returning false -- there is no
+  // client-side success condition for this step, the backend is the only
+  // authority.
+  verifyPickupOtp(code: string): Promise<void>;
   markArrivedAtDropoff(): Promise<void>;
   endDuty(input: DutyEndInput): Promise<DutyEndResult>;
-  checkPaymentStatus(): Promise<{ paid: boolean; status: string }>;
-  returnToGarage(): Promise<void>;
+  checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null }>;
+  // location is best-effort -- a missing GPS fix doesn't block the real
+  // backend confirmation, it just leaves the checkpoint flagged
+  // NEEDS_REVIEW server-side.
+  returnToGarage(location?: DutyLocationInput | null): Promise<void>;
   closeDuty(): Promise<void>;
 }
 

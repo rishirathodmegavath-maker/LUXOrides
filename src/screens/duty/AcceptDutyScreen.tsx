@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
@@ -32,6 +32,8 @@ export function AcceptDutyScreen({ navigation }: Props) {
     try {
       await dutyService.acceptDuty(todayDuty.id);
       navigation.replace("UniformSelfie");
+    } catch (e) {
+      Alert.alert("Couldn't accept duty", e instanceof Error ? e.message : "Please try again.");
     } finally {
       setLoading(false);
     }

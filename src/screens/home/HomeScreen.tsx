@@ -9,6 +9,7 @@ import type { MainTabParamList, RootStackParamList } from "../../navigation/type
 import { Button, Card, Chip, StatusToggle } from "../../components";
 import { driverService, dutyService } from "../../services";
 import { useDutyStore } from "../../store/dutyStore";
+import { reconcileActiveDuty, type DutyResumeTarget } from "../../util/resumeDuty";
 import { colors, spacing, type } from "../../theme";
 
 type Props = CompositeScreenProps<
@@ -35,6 +36,7 @@ export function HomeScreen({ navigation }: Props) {
   const todayDuty = useDutyStore((s) => s.todayDuty);
   const setTodayDuty = useDutyStore((s) => s.setTodayDuty);
   const [driverName, setDriverName] = React.useState<string | null>(null);
+  const [resumeTarget, setResumeTarget] = React.useState<DutyResumeTarget | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -48,6 +50,11 @@ export function HomeScreen({ navigation }: Props) {
     useCallback(() => {
       let active = true;
       dutyService.getTodayDuty().then((d) => active && setTodayDuty(d));
+      // Reconciles any genuinely-started duty against the real backend
+      // state (GET /driver/app/duties/{dutyId}) so an app restart mid-duty
+      // routes back into the correct real screen instead of silently losing
+      // it — see resumeDuty.ts.
+      reconcileActiveDuty().then((target) => active && setResumeTarget(target));
       return () => {
         active = false;
       };
@@ -94,25 +101,35 @@ export function HomeScreen({ navigation }: Props) {
                 <Text style={styles.stopLabel}>PICKUP</Text>
                 <Text style={styles.stopAddress}>{todayDuty.pickup.address}</Text>
               </View>
-              <View style={styles.stopMeta}>
-                <Text style={styles.stopKm}>{todayDuty.pickup.distanceKm} KM</Text>
-                <Text style={styles.stopMin}>{todayDuty.pickup.etaMinutes} mins</Text>
-              </View>
+              {todayDuty.pickup.distanceKm != null && todayDuty.pickup.etaMinutes != null ? (
+                <View style={styles.stopMeta}>
+                  <Text style={styles.stopKm}>{todayDuty.pickup.distanceKm} KM</Text>
+                  <Text style={styles.stopMin}>{todayDuty.pickup.etaMinutes} mins</Text>
+                </View>
+              ) : null}
             </View>
             <View style={styles.stopRow}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.stopLabel, { color: colors.gold[500] }]}>DROP OFF</Text>
                 <Text style={styles.stopAddress}>{todayDuty.dropoff.address}</Text>
               </View>
-              <View style={styles.stopMeta}>
-                <Text style={styles.stopKm}>{todayDuty.dropoff.distanceKm} KM</Text>
-                <Text style={styles.stopMin}>{Math.round(todayDuty.dropoff.etaMinutes / 60)}hr {todayDuty.dropoff.etaMinutes % 60} min</Text>
-              </View>
+              {todayDuty.dropoff.distanceKm != null && todayDuty.dropoff.etaMinutes != null ? (
+                <View style={styles.stopMeta}>
+                  <Text style={styles.stopKm}>{todayDuty.dropoff.distanceKm} KM</Text>
+                  <Text style={styles.stopMin}>
+                    {Math.round(todayDuty.dropoff.etaMinutes / 60)}hr {todayDuty.dropoff.etaMinutes % 60} min
+                  </Text>
+                </View>
+              ) : null}
             </View>
 
             <View style={styles.ctaRow}>
               <Button label="Trip Details" variant="secondary" style={{ flex: 1 }} onPress={() => navigation.navigate("TripDetails", { dutyId: todayDuty.id })} />
-              <Button label="Start Duty" style={{ flex: 1 }} onPress={() => navigation.navigate("Duty", { screen: "AcceptDuty" })} />
+              <Button
+                label={resumeTarget ? "Resume Duty" : "Start Duty"}
+                style={{ flex: 1 }}
+                onPress={() => navigation.navigate("Duty", { screen: resumeTarget ?? "AcceptDuty" })}
+              />
             </View>
           </Card>
         ) : (

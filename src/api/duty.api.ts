@@ -1,13 +1,22 @@
 import { privateApi, tokenApi, type FilePart } from "./client";
 import type {
+  CloseDutyConfirmationResponse,
   DriverAppDutyTokenResponse,
+  DriverDutyAcceptanceResponse,
+  DriverDutyDeclineRequest,
+  DriverDutyDeclineResponse,
   DriverDutyEndRequest,
   DriverDutyEndResponse,
+  DriverDutyReturnGarageRequest,
   DriverDutyStartRequest,
   DriverDutyStartResponse,
   DriverDutySummaryResponse,
   DutySummaryForDriverDTO,
+  GarageReturnConfirmationResponse,
   Page,
+  PickupOtpGenerateResponse,
+  PickupOtpVerifyRequest,
+  PickupOtpVerifyResponse,
   QrPaymentStatusResponse,
 } from "./duty.types";
 
@@ -27,6 +36,14 @@ export const dutyApi = {
 
   issueExecutionToken(dutyId: string): Promise<DriverAppDutyTokenResponse> {
     return privateApi.post<DriverAppDutyTokenResponse>(`/driver/app/duties/${dutyId}/token`);
+  },
+
+  acceptDuty(dutyId: string): Promise<DriverDutyAcceptanceResponse> {
+    return privateApi.post<DriverDutyAcceptanceResponse>(`/driver/app/duties/${dutyId}/accept`);
+  },
+
+  declineDuty(dutyId: string, payload: DriverDutyDeclineRequest): Promise<DriverDutyDeclineResponse> {
+    return privateApi.post<DriverDutyDeclineResponse>(`/driver/app/duties/${dutyId}/decline`, payload);
   },
 
   // Token-authenticated duty execution API (no Bearer header — the token in
@@ -55,5 +72,21 @@ export const dutyApi = {
       odometerPhoto,
       ...(receiptPhotos && receiptPhotos.length > 0 ? { receiptPhotos } : {}),
     });
+  },
+
+  generatePickupOtp(token: string): Promise<PickupOtpGenerateResponse> {
+    return tokenApi.post<PickupOtpGenerateResponse>(`/driver-api/duty/${token}/pickup-otp/generate`);
+  },
+
+  verifyPickupOtp(token: string, payload: PickupOtpVerifyRequest): Promise<PickupOtpVerifyResponse> {
+    return tokenApi.post<PickupOtpVerifyResponse>(`/driver-api/duty/${token}/pickup-otp/verify`, payload);
+  },
+
+  confirmGarageReturn(token: string, payload: DriverDutyReturnGarageRequest | null): Promise<GarageReturnConfirmationResponse> {
+    return tokenApi.post<GarageReturnConfirmationResponse>(`/driver-api/duty/${token}/return-garage`, payload ?? undefined);
+  },
+
+  closeDuty(token: string): Promise<CloseDutyConfirmationResponse> {
+    return tokenApi.post<CloseDutyConfirmationResponse>(`/driver-api/duty/${token}/close`);
   },
 };

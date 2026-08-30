@@ -5,17 +5,26 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
 import { Button, ScreenContainer } from "../../components";
 import { paymentService } from "../../services";
+import { useDutyStore } from "../../store/dutyStore";
 import { colors, radius, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<DutyStackParamList, "CashPaymentReceived">;
 
 // Mirrors the Figma "Cash Payment Received" frame (node 675:11237).
 export function CashPaymentReceivedScreen({ navigation }: Props) {
-  const [confirming, setConfirming] = useState(true);
+  const amountToCollect = useDutyStore((s) => s.dutyEndResult?.amountToCollect);
+  // amountToCollect can only be missing if this screen is somehow reached
+  // without a real endDuty() result in the store, which the navigator graph
+  // doesn't allow (PaymentBilling, the only route here, requires
+  // dutyEndResult to render its own amount) -- but never silently confirm an
+  // invented amount if it happens anyway, so start "not confirming" rather
+  // than block the Continue button on a call that will never be made.
+  const [confirming, setConfirming] = useState(amountToCollect != null);
 
   useEffect(() => {
-    paymentService.confirmCashPayment(0).then(() => setConfirming(false));
-  }, []);
+    if (amountToCollect == null) return;
+    paymentService.confirmCashPayment(amountToCollect).then(() => setConfirming(false));
+  }, [amountToCollect]);
 
   return (
     <ScreenContainer style={styles.wrap} footer={<Button label="Continue" onPress={() => navigation.navigate("DutyCompletionSlip")} disabled={confirming} />}>

@@ -3,8 +3,9 @@ import { StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
-import { Button, Chip, MapPreview, StatusToggle } from "../../components";
+import { Button, Chip, DutyMap, StatusToggle } from "../../components";
 import { useDutyStore } from "../../store/dutyStore";
+import { useLiveDriverPosition } from "../../hooks/useLiveDriverPosition";
 import { colors, radius, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<DutyStackParamList, "DropOffMap">;
@@ -14,6 +15,7 @@ type Props = NativeStackScreenProps<DutyStackParamList, "DropOffMap">;
 export function DropOffMapScreen({ navigation }: Props) {
   const duty = useDutyStore((s) => s.todayDuty);
   const online = useDutyStore((s) => s.online);
+  const driverPosition = useLiveDriverPosition();
   const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
@@ -28,14 +30,18 @@ export function DropOffMapScreen({ navigation }: Props) {
         <StatusToggle online={online} onToggle={() => {}} />
         <Feather name="bell" size={24} color={colors.textPrimary} />
       </View>
-      <MapPreview style={{ flex: 1 }} />
+      <DutyMap driverPosition={driverPosition} style={{ flex: 1 }} />
       <View style={styles.sheet}>
         <View style={styles.handle} />
         <Chip
           label={`Ride in progress · ${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`}
           tone="success"
         />
-        <Text style={styles.eta}>{duty?.dropoff.etaMinutes ?? 96} mins ({duty?.dropoff.distanceKm ?? 26}Km) to drop-off</Text>
+        {duty?.dropoff.etaMinutes != null && duty.dropoff.distanceKm != null ? (
+          <Text style={styles.eta}>{duty.dropoff.etaMinutes} mins ({duty.dropoff.distanceKm}Km) to drop-off</Text>
+        ) : (
+          <Text style={styles.eta}>Distance/ETA not available</Text>
+        )}
         <Text style={styles.address} numberOfLines={2}>{duty?.dropoff.address}</Text>
         <Button label="Arrived at Drop-off" style={{ marginTop: spacing.lg }} onPress={() => navigation.navigate("ArrivedAtDropOff")} />
       </View>

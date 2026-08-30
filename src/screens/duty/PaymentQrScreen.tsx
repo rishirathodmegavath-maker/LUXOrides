@@ -17,20 +17,29 @@ export function PaymentQrScreen({ navigation }: Props) {
   const result = useDutyStore((s) => s.dutyEndResult);
   const executionToken = useDutyStore((s) => s.executionToken);
   const [paid, setPaid] = useState(false);
+  const [amount, setAmount] = useState<number | null>(result?.amountToCollect ?? null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(result?.qrCodeUrl ?? null);
 
   useEffect(() => {
     if (!executionToken || paid) return;
-    const interval = setInterval(async () => {
+    // Also what makes the reconcileActiveDuty resume path work: after a
+    // restart, dutyEndResult is gone (only executionToken survives), so this
+    // is what actually populates the QR/amount.
+    const refresh = async () => {
       const status = await dutyService.checkPaymentStatus();
+      if (status.amount != null) setAmount(status.amount);
+      if (status.qrImageUrl) setQrCodeUrl(status.qrImageUrl);
       if (status.paid) setPaid(true);
-    }, POLL_INTERVAL_MS);
+    };
+    refresh();
+    const interval = setInterval(refresh, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [executionToken, paid]);
 
   return (
     <ScreenContainer footer={<Button label="Payment Received" onPress={() => navigation.navigate("DutyCompletionSlip")} />}>
       <ScreenHeader onBack={() => navigation.goBack()} title="Scan to Pay" />
-      <QrPaymentCard qrCodeUrl={result?.qrCodeUrl} amount={result?.amountToCollect} paid={paid} />
+      <QrPaymentCard qrCodeUrl={qrCodeUrl} amount={amount} paid={paid} />
     </ScreenContainer>
   );
 }

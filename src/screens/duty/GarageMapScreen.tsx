@@ -1,10 +1,13 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
-import { Button, MapPreview } from "../../components";
+import { Button, DutyMap } from "../../components";
 import { dutyService } from "../../services";
+import { useDutyStore } from "../../store/dutyStore";
+import { useLiveDriverPosition } from "../../hooks/useLiveDriverPosition";
+import { remainingDistanceKm } from "../../util/routeDistance";
 import { colors, radius, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<DutyStackParamList, "GarageMap">;
@@ -13,20 +16,42 @@ type Props = NativeStackScreenProps<DutyStackParamList, "GarageMap">;
 // (nodes 675:11092, 675:11049) — one dynamic screen for arriving vs.
 // duty-complete state instead of two routes.
 export function GarageMapScreen({ navigation }: Props) {
+  const returnRoute = useDutyStore((s) => s.dutyEndResult?.returnRoute);
+  const driverPosition = useLiveDriverPosition();
   const [arrived, setArrived] = useState(false);
+  const [closing, setClosing] = useState(false);
+
+  const remainingKm = returnRoute?.routeAvailable
+    ? remainingDistanceKm(returnRoute.geometry, driverPosition)
+    : null;
 
   const onConfirm = async () => {
     if (!arrived) {
       setArrived(true);
       return;
     }
-    await dutyService.closeDuty();
-    navigation.navigate("DutyClosed");
+    setClosing(true);
+    try {
+      await dutyService.closeDuty();
+      navigation.navigate("DutyClosed");
+    } catch (e) {
+      Alert.alert("Couldn't close duty", e instanceof Error ? e.message : "Please try again.");
+    } finally {
+      setClosing(false);
+    }
   };
 
   return (
     <View style={styles.root}>
-      <MapPreview style={{ flex: 1 }} />
+      <DutyMap
+        driverPosition={driverPosition}
+        route={
+          returnRoute?.routeAvailable
+            ? { geometry: returnRoute.geometry, from: returnRoute.dropLocation, to: returnRoute.garageLocation }
+            : null
+        }
+        style={{ flex: 1 }}
+      />
       <View style={styles.sheet}>
         <View style={styles.handle} />
         <View style={styles.iconRow}>
@@ -36,9 +61,11 @@ export function GarageMapScreen({ navigation }: Props) {
         <Text style={styles.subtitle}>
           {arrived
             ? "You've returned to the garage. This duty is now complete."
-            : "You're nearly back at Garage Inc., New Delhi."}
+            : remainingKm != null
+              ? `${remainingKm.toFixed(1)} km remaining to the garage.`
+              : "Returning to the garage."}
         </Text>
-        <Button label={arrived ? "Close Duty" : "Mark Arrived"} style={{ marginTop: spacing.lg }} onPress={onConfirm} />
+        <Button label={arrived ? "Close Duty" : "Mark Arrived"} style={{ marginTop: spacing.lg }} onPress={onConfirm} loading={closing} />
       </View>
     </View>
   );

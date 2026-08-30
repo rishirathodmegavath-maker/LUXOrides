@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { StyleSheet, Text } from "react-native";
+import { Alert, StyleSheet, Text } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
 import { Button, ScreenContainer, ScreenHeader, TextField } from "../../components";
@@ -30,6 +30,8 @@ export function DeclineDutyScreen({ navigation }: Props) {
       resetDuty();
       setTodayDuty(null);
       navigation.getParent()?.navigate("Main", { screen: "Home" });
+    } catch (e) {
+      Alert.alert("Couldn't decline duty", e instanceof Error ? e.message : "Please try again.");
     } finally {
       setSubmitting(false);
     }

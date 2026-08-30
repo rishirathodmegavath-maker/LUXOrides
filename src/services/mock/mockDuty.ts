@@ -1,4 +1,4 @@
-import { DutyEndInput, DutyEndResult, DutyService, DutyStartInput, DutySummary, ReadinessChecklist, TripListItem } from "../types";
+import { DutyEndInput, DutyEndResult, DutyLocationInput, DutyService, DutyStartInput, DutySummary, ReadinessChecklist, TripListItem } from "../types";
 import { delay } from "./utils";
 
 const TRIPS: TripListItem[] = [
@@ -100,9 +100,15 @@ export class MockDutyService implements DutyService {
     await delay(null, 500);
   }
 
-  async verifyPickupOtp(code: string): Promise<boolean> {
+  async requestPickupOtp(): Promise<void> {
+    await delay(null, 400);
+  }
+
+  async verifyPickupOtp(code: string): Promise<void> {
     await delay(null, 700);
-    return code === "123456";
+    if (code !== "123456") {
+      throw new Error("Incorrect code. Ask the client to confirm the OTP.");
+    }
   }
 
   async markArrivedAtDropoff(): Promise<void> {
@@ -111,16 +117,23 @@ export class MockDutyService implements DutyService {
 
   async endDuty(_input: DutyEndInput): Promise<DutyEndResult> {
     return delay(
-      { distanceKm: 57.5, durationLabel: "3 Hrs 30 mins", amountToCollect: 4200, qrCodeUrl: null, paymentLink: null },
+      {
+        distanceKm: 57.5,
+        durationLabel: "3 Hrs 30 mins",
+        amountToCollect: 4200,
+        qrCodeUrl: null,
+        paymentLink: null,
+        returnRoute: null,
+      },
       600
     );
   }
 
-  async checkPaymentStatus(): Promise<{ paid: boolean; status: string }> {
-    return delay({ paid: true, status: "PAID" }, 800);
+  async checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null }> {
+    return delay({ paid: true, status: "PAID", amount: null, qrImageUrl: null }, 800);
   }
 
-  async returnToGarage(): Promise<void> {
+  async returnToGarage(_location?: DutyLocationInput | null): Promise<void> {
     await delay(null, 800);
   }
 

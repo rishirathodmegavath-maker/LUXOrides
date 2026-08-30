@@ -28,6 +28,11 @@ export interface DutySummaryForDriverDTO {
   startAt: string | null;
   endAt: string | null;
   dutyTotal: Money;
+  driverAcceptedAt: string | null;
+  driverDeclinedAt: string | null;
+  pickupOtpVerifiedAt: string | null;
+  garageReturnConfirmedAt: string | null;
+  dutyClosedAt: string | null;
 }
 
 export interface Page<T> {
@@ -100,11 +105,41 @@ export interface DriverDutyEndRequest {
   extraCharges?: DriverDutyExpenseInput[];
 }
 
+export interface GeoPoint {
+  lat: number;
+  lng: number;
+}
+
+// Mirrors com.core.dtos.driverduty.ReturnRouteEstimate exactly (verified
+// against a live /end response, not guessed). geometry is only populated
+// when a real road route came back (OpenRouteService) -- when routeAvailable
+// is false there is no route to draw, and the client must not fabricate one.
 export interface ReturnRouteEstimate {
   distanceKm: number;
   durationSeconds: number;
   provider: string;
   routeAvailable: boolean;
+  dropLocation: GeoPoint | null;
+  garageLocation: GeoPoint | null;
+  geometry: GeoPoint[] | null;
+}
+
+// Mirrors com.core.dtos.driverduty.PackageFareBreakdown exactly. Pure read-out of the
+// package/rate-card figures BookingUtil already computed onto the duty (base fare, included
+// km/time, extra km/time chargeable + their rates) -- never a second, client-side fare calc.
+export interface PackageFareBreakdown {
+  dutyType: string | null;
+  packageUnit: string | null;
+  includedDistanceKm: number | null;
+  includedTimeUnits: number | null;
+  baseFareAmount: number | null;
+  extraDistanceKm: number;
+  extraDistanceRatePerKm: number | null;
+  extraDistanceCharge: number;
+  extraTimeHours: number;
+  extraTimeRatePerHour: number | null;
+  extraTimeCharge: number;
+  projectedTotalDurationSeconds: number | null;
 }
 
 export interface DutyCompletionSummary {
@@ -121,6 +156,9 @@ export interface DutyCompletionSummary {
   actualDrivenKm: number | null;
   projectedTotalKm: number | null;
   returnRoute: ReturnRouteEstimate | null;
+  fareBreakdown: PackageFareBreakdown | null;
+  gstAmount: number | null;
+  gstRatePercent: number | null;
 }
 
 export interface PaymentInstruction {
@@ -137,6 +175,57 @@ export interface DriverDutyEndResponse {
   summary: DutyCompletionSummary;
   paymentInstruction: PaymentInstruction;
   message: string | null;
+}
+
+// Mirrors com.core.dtos.driverduty.DriverDutyAcceptanceResponse / DriverDutyDeclineRequest / DriverDutyDeclineResponse.
+export interface DriverDutyAcceptanceResponse {
+  dutyId: string;
+  accepted: boolean;
+  acceptedAt: string | null;
+}
+
+export interface DriverDutyDeclineRequest {
+  reason: string;
+}
+
+export interface DriverDutyDeclineResponse {
+  dutyId: string;
+  declined: boolean;
+  declinedAt: string | null;
+  reason: string | null;
+}
+
+// Mirrors com.core.dtos.driverduty.PickupOtpGenerateResponse / PickupOtpVerifyRequest / PickupOtpVerifyResponse.
+export interface PickupOtpGenerateResponse {
+  sent: boolean;
+  expiresInSeconds: number;
+  alreadyVerified: boolean;
+}
+
+export interface PickupOtpVerifyRequest {
+  otp: string;
+}
+
+export interface PickupOtpVerifyResponse {
+  verified: boolean;
+  verifiedAt: string | null;
+}
+
+// Mirrors com.core.dtos.driverduty.DriverDutyReturnGarageRequest / GarageReturnConfirmationResponse / CloseDutyConfirmationResponse.
+export interface DriverDutyReturnGarageRequest {
+  location: AddressSnapshot | null;
+  accuracyMeters: number | null;
+  locationCapturedAt: string | null;
+}
+
+export interface GarageReturnConfirmationResponse {
+  confirmed: boolean;
+  confirmedAt: string | null;
+}
+
+export interface CloseDutyConfirmationResponse {
+  closed: boolean;
+  closedAt: string | null;
 }
 
 export interface QrPaymentStatusResponse {

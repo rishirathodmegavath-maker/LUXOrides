@@ -3,9 +3,10 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
-import { MapPreview, PhotoCapture, SlideToConfirm, StatusToggle, TextField } from "../../components";
+import { DutyMap, PhotoCapture, SlideToConfirm, StatusToggle, TextField } from "../../components";
 import { dutyService } from "../../services";
 import { useDutyStore } from "../../store/dutyStore";
+import { useLiveDriverPosition } from "../../hooks/useLiveDriverPosition";
 import { captureCurrentLocation } from "../../util/location";
 import { colors, radius, spacing, type } from "../../theme";
 
@@ -18,6 +19,7 @@ type Props = NativeStackScreenProps<DutyStackParamList, "DutyStartMap">;
 export function DutyStartMapScreen({ navigation }: Props) {
   const duty = useDutyStore((s) => s.todayDuty);
   const online = useDutyStore((s) => s.online);
+  const driverPosition = useLiveDriverPosition();
   const [starting, setStarting] = useState(false);
   const [odometerKm, setOdometerKm] = useState("");
   const [photoUri, setPhotoUri] = useState<string | undefined>();
@@ -44,12 +46,16 @@ export function DutyStartMapScreen({ navigation }: Props) {
         <StatusToggle online={online} onToggle={() => {}} />
         <Feather name="bell" size={24} color={colors.textPrimary} />
       </View>
-      <MapPreview style={{ flex: 1 }} />
+      <DutyMap driverPosition={driverPosition} style={{ flex: 1 }} />
       <View style={styles.sheet}>
         <View style={styles.handle} />
-        <Text style={styles.eta}>
-          {duty?.pickup.etaMinutes ?? 30} mins ({duty?.pickup.distanceKm ?? 15}Km) away
-        </Text>
+        {duty?.pickup.etaMinutes != null && duty.pickup.distanceKm != null ? (
+          <Text style={styles.eta}>
+            {duty.pickup.etaMinutes} mins ({duty.pickup.distanceKm}Km) away
+          </Text>
+        ) : (
+          <Text style={styles.eta}>Distance/ETA not available</Text>
+        )}
         <View style={styles.stopRow}>
           <View style={styles.dotGreen} />
           <Text style={styles.address} numberOfLines={2}>{duty?.pickup.address}</Text>

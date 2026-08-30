@@ -15,4 +15,4 @@ export * from "./Dropdown";
 export * from "./ScreenHeader";
 export * from "./PhotoCapture";
 export * from "./QrPaymentCard";
-export * from "./MapPreview";
+export * from "./DutyMap";

@@ -1,11 +1,30 @@
 import { dutyApi } from "../../api/duty.api";
-import type { AddressSnapshot, DriverDutyExpenseInput, DutySummaryForDriverDTO } from "../../api/duty.types";
+import type { AddressSnapshot, DriverDutyExpenseInput, DutySummaryForDriverDTO, PackageFareBreakdown } from "../../api/duty.types";
+import { dutyStorage } from "../../storage/dutyStorage";
 import { useDutyStore } from "../../store/dutyStore";
 import { MockDutyService } from "../mock/mockDuty";
-import { DutyEndInput, DutyEndResult, DutyService, DutyStartInput, DutySummary, ReadinessChecklist, TripListItem } from "../types";
+import { DutyEndInput, DutyEndResult, DutyLocationInput, DutyService, DutyStartInput, DutySummary, FareBreakdown, ReadinessChecklist, TripListItem } from "../types";
 
 function money(dto: DutySummaryForDriverDTO): number | undefined {
   return dto.dutyTotal?.amount;
+}
+
+function toFareBreakdown(dto: PackageFareBreakdown | null): FareBreakdown | null {
+  if (!dto) return null;
+  return {
+    dutyTypeLabel: dto.dutyType,
+    packageUnit: dto.packageUnit,
+    includedDistanceKm: dto.includedDistanceKm,
+    includedTimeUnits: dto.includedTimeUnits,
+    baseFareAmount: dto.baseFareAmount,
+    extraDistanceKm: dto.extraDistanceKm,
+    extraDistanceRatePerKm: dto.extraDistanceRatePerKm,
+    extraDistanceCharge: dto.extraDistanceCharge,
+    extraTimeHours: dto.extraTimeHours,
+    extraTimeRatePerHour: dto.extraTimeRatePerHour,
+    extraTimeCharge: dto.extraTimeCharge,
+    projectedTotalDurationSeconds: dto.projectedTotalDurationSeconds,
+  };
 }
 
 function tripStatus(status: DutySummaryForDriverDTO["status"]): TripListItem["status"] {
@@ -45,27 +64,27 @@ function formatDuration(startAt: string | null, endAt: string | null): string {
   return hours > 0 ? `${hours} Hrs ${minutes} mins` : `${minutes} mins`;
 }
 
-function toDutySummary(dto: DutySummaryForDriverDTO): DutySummary {
+export function toDutySummary(dto: DutySummaryForDriverDTO): DutySummary {
   return {
     id: dto.dutyId,
     type: dto.vehicleName,
     reportTime: new Date(dto.reportingTime).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }),
-    // The real DTO has no live-routing figures (distance/ETA) — Phase 1
-    // already treats maps/ORS as out of scope (see MapPreview), so this
-    // stays a static label rather than fabricating numbers the backend
-    // doesn't provide.
+    // The real DTO has no live-routing figures (distance/ETA) for the
+    // pickup/drop legs — only the drop->garage return leg (computed at duty
+    // end) carries real distance/route data. Leaving this blank rather than
+    // fabricating a duration the backend doesn't provide.
     durationLabel: "",
     clientName: dto.clientName,
-    pickup: { label: "PICKUP", address: dto.reportingLocation, distanceKm: 0, etaMinutes: 0 },
-    dropoff: { label: "DROP OFF", address: dto.dropLocation ?? "—", distanceKm: 0, etaMinutes: 0 },
+    pickup: { label: "PICKUP", address: dto.reportingLocation, distanceKm: null, etaMinutes: null },
+    dropoff: { label: "DROP OFF", address: dto.dropLocation ?? "—", distanceKm: null, etaMinutes: null },
   };
 }
 
-// Real backend has genuine endpoints for the duty list/detail dashboard
-// (DriverAppController, /driver/app/**) — live-verified against the
-// running backend. It has NO endpoint at all for pre-duty readiness,
-// accept/decline persistence, or pickup-OTP, so those still delegate to
-// the mock (composition, not a full rewrite) per the agreed Day-2 scope.
+// Phase 1: accept/decline, pickup OTP, return-to-garage, and close-duty are
+// all now real, backend-authoritative calls (DriverAppController /
+// ExternalDriverDutyController). Pre-duty readiness (submitReadiness/
+// getReadinessStatus) is out of this phase's scope and still delegates to
+// the mock.
 export class FleetovoDutyService implements DutyService {
   private mock = new MockDutyService();
 
@@ -89,12 +108,12 @@ export class FleetovoDutyService implements DutyService {
     }
   }
 
-  acceptDuty(dutyId: string): Promise<void> {
-    return this.mock.acceptDuty(dutyId);
+  async acceptDuty(dutyId: string): Promise<void> {
+    await dutyApi.acceptDuty(dutyId);
   }
 
-  declineDuty(dutyId: string, reason: string): Promise<void> {
-    return this.mock.declineDuty(dutyId, reason);
+  async declineDuty(dutyId: string, reason: string): Promise<void> {
+    await dutyApi.declineDuty(dutyId, { reason });
   }
 
   submitReadiness(checklist: ReadinessChecklist): Promise<void> {
@@ -116,6 +135,11 @@ export class FleetovoDutyService implements DutyService {
     }
     const { token } = await dutyApi.issueExecutionToken(todayDuty.id);
     useDutyStore.getState().setExecutionToken(token);
+    // Persist before the actual /start call so a restart between minting
+    // the token and the start call succeeding can still reconcile — worst
+    // case reconcileActiveDuty finds the duty not yet started server-side
+    // and drops the stale reference (see its own comment).
+    await dutyStorage.setActiveDuty({ dutyId: todayDuty.id, executionToken: token });
     await dutyApi.submitStart(
       token,
       {
@@ -128,8 +152,20 @@ export class FleetovoDutyService implements DutyService {
     );
   }
 
-  verifyPickupOtp(code: string): Promise<boolean> {
-    return this.mock.verifyPickupOtp(code);
+  async requestPickupOtp(): Promise<void> {
+    const token = useDutyStore.getState().executionToken;
+    if (!token) {
+      throw new Error("No active duty — pickup OTP requires a started duty.");
+    }
+    await dutyApi.generatePickupOtp(token);
+  }
+
+  async verifyPickupOtp(code: string): Promise<void> {
+    const token = useDutyStore.getState().executionToken;
+    if (!token) {
+      throw new Error("No active duty — pickup OTP requires a started duty.");
+    }
+    await dutyApi.verifyPickupOtp(token, { otp: code });
   }
 
   markArrivedAtDropoff(): Promise<void> {
@@ -156,27 +192,65 @@ export class FleetovoDutyService implements DutyService {
       },
       { uri: input.photoUri, name: "odometer-end.jpg", type: "image/jpeg" }
     );
+    const route = res.summary.returnRoute;
     return {
       distanceKm: res.summary.totalKm ?? res.summary.actualDrivenKm ?? 0,
       durationLabel: formatDuration(res.summary.startAt, res.summary.endAt),
       amountToCollect: res.paymentInstruction.amount,
       qrCodeUrl: res.paymentInstruction.qrCodeUrl,
       paymentLink: res.paymentInstruction.paymentLink,
+      returnRoute: route
+        ? {
+            distanceKm: route.distanceKm,
+            durationSeconds: route.durationSeconds,
+            routeAvailable: route.routeAvailable,
+            dropLocation: route.dropLocation,
+            garageLocation: route.garageLocation,
+            geometry: route.geometry,
+          }
+        : null,
+      actualDrivenKm: res.summary.actualDrivenKm,
+      projectedTotalKm: res.summary.projectedTotalKm,
+      expensesTotal: res.summary.extraChargesTotal,
+      fareBreakdown: toFareBreakdown(res.summary.fareBreakdown),
+      gstAmount: res.summary.gstAmount,
+      gstRatePercent: res.summary.gstRatePercent,
     };
   }
 
-  async checkPaymentStatus(): Promise<{ paid: boolean; status: string }> {
+  async checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null }> {
     const token = useDutyStore.getState().executionToken;
-    if (!token) return { paid: false, status: "NOT_CREATED" };
+    if (!token) return { paid: false, status: "NOT_CREATED", amount: null, qrImageUrl: null };
     const res = await dutyApi.checkQrPaymentStatus(token);
-    return { paid: res.paid, status: res.status };
+    // amount/qrImageUrl let PaymentQrScreen render correctly even when it's
+    // reached via reconcileActiveDuty's resume path, where no dutyEndResult
+    // exists in the store (only the execution token was restored) — this
+    // endpoint is the one place that still has them after a restart.
+    return { paid: res.paid, status: res.status, amount: res.amount, qrImageUrl: res.qrImageUrl };
   }
 
-  returnToGarage(): Promise<void> {
-    return this.mock.returnToGarage();
+  async returnToGarage(location?: DutyLocationInput | null): Promise<void> {
+    const token = useDutyStore.getState().executionToken;
+    if (!token) {
+      throw new Error("No active duty — return-to-garage requires a completed duty.");
+    }
+    await dutyApi.confirmGarageReturn(
+      token,
+      location
+        ? {
+            location: toAddressSnapshot(location),
+            accuracyMeters: location.accuracyMeters ?? null,
+            locationCapturedAt: new Date().toISOString(),
+          }
+        : null
+    );
   }
 
-  closeDuty(): Promise<void> {
-    return this.mock.closeDuty();
+  async closeDuty(): Promise<void> {
+    const token = useDutyStore.getState().executionToken;
+    if (!token) {
+      throw new Error("No active duty — close-duty requires a completed duty.");
+    }
+    await dutyApi.closeDuty(token);
   }
 }

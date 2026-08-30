@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { DutyEndResult, DutySummary, ReadinessChecklist } from "../services/types";
+import { dutyStorage } from "../storage/dutyStorage";
 
 interface DutyState {
   online: boolean;
@@ -33,11 +34,17 @@ export const useDutyStore = create<DutyState>((set) => ({
   setReadinessStatus: (readinessStatus) => set({ readinessStatus }),
   setExecutionToken: (executionToken) => set({ executionToken }),
   setDutyEndResult: (dutyEndResult) => set({ dutyEndResult }),
-  resetDuty: () =>
+  resetDuty: () => {
+    // Fire-and-forget: the persisted SecureStore entry only matters for
+    // resuming a genuinely active duty, and this duty is now done (the two
+    // call sites are DutyClosedScreen and DeclineDutyScreen) — nothing
+    // downstream needs to await the clear completing.
+    dutyStorage.clearActiveDuty().catch(() => {});
     set({
       checklist: { vehicleExteriorUris: [], vehicleInteriorUris: [] },
       readinessStatus: "pending",
       executionToken: null,
       dutyEndResult: null,
-    }),
+    });
+  },
 }));

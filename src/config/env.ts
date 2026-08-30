@@ -9,7 +9,11 @@ function required(value: string | undefined, name: string): string {
   return value;
 }
 
+const apiBaseUrl = required(process.env.EXPO_PUBLIC_API_BASE_URL, "EXPO_PUBLIC_API_BASE_URL");
+
 export const env = {
-  apiBaseUrl: required(process.env.EXPO_PUBLIC_API_BASE_URL, "EXPO_PUBLIC_API_BASE_URL"),
+  apiBaseUrl,
   orgId: required(process.env.EXPO_PUBLIC_ORG_ID, "EXPO_PUBLIC_ORG_ID"),
+  // Derived so it can never drift from apiBaseUrl -- http(s) -> ws(s), same host.
+  wsBaseUrl: apiBaseUrl.replace(/^http/, "ws"),
 };

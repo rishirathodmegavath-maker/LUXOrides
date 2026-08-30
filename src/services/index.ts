@@ -1,9 +1,9 @@
-import { MockOnboardingService } from "./mock/mockOnboarding";
 import { MockPaymentService } from "./mock/mockPayment";
 import { MockSupportService } from "./mock/mockSupport";
 import { FleetovoAuthService } from "./real/FleetovoAuthService";
 import { FleetovoDriverService } from "./real/FleetovoDriverService";
 import { FleetovoDutyService } from "./real/FleetovoDutyService";
+import { FleetovoOnboardingService } from "./real/FleetovoOnboardingService";
 import {
   AuthService,
   DriverServiceApi,
@@ -13,16 +13,19 @@ import {
   SupportService,
 } from "./types";
 
-// Day 1: auth + driver session are wired to the real Fleetovo backend.
-// Everything else (onboarding/KYC, duty, payment, support) stays on mocks
-// until their own integration day — swapping any of them later means
-// implementing the same interface (see ./types) and changing only the
+// Auth, driver session, onboarding documents, and duty list/detail +
+// execution are wired to the real Fleetovo backend; payment and support
+// stay on mocks until their own integration day. Swapping any of them later
+// means implementing the same interface (see ./types) and changing only the
 // instantiation below, no screen/component code needs to change. Exports
 // are explicitly typed as the interface (not the concrete class) so call
 // sites only ever depend on the contract.
 export const authService: AuthService = new FleetovoAuthService();
 export const driverService: DriverServiceApi = new FleetovoDriverService();
-export const onboardingService: OnboardingService = new MockOnboardingService();
+// Document upload/status call the real backend; profile basics/garage
+// location/approval submission still delegate to the mock internally — see
+// FleetovoOnboardingService's own comment.
+export const onboardingService: OnboardingService = new FleetovoOnboardingService();
 // Duty list/detail (getTodayDuty/getTrips/getTripById) call the real
 // backend; readiness/accept-decline/pickup-OTP/start/end still delegate to
 // the mock internally — see FleetovoDutyService's own comment.

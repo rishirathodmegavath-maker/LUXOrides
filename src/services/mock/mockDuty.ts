@@ -1,4 +1,4 @@
-import { DutyEndInput, DutyEndResult, DutyLocationInput, DutyService, DutyStartInput, DutySummary, ReadinessChecklist, TripListItem } from "../types";
+import { DutyEndInput, DutyEndResult, DutyLegRoute, DutyLocationInput, DutyRouteLeg, DutyService, DutyStartInput, DutySummary, IncidentReportInput, ReadinessChecklist, TripListItem } from "../types";
 import { delay } from "./utils";
 
 const TRIPS: TripListItem[] = [
@@ -49,6 +49,7 @@ const TODAY_DUTY: DutySummary = {
   reportTime: "09:30 AM",
   durationLabel: "4Hours/ 40Kms",
   clientName: "Aditya Sharma",
+  clientPhone: "+919876543210",
   pickup: {
     label: "PICKUP",
     address: "The Leela Palace, Diplomatic Enclave, Chanakyapuri, Delhi- 110023",
@@ -139,5 +140,22 @@ export class MockDutyService implements DutyService {
 
   async closeDuty(): Promise<void> {
     await delay(null, 500);
+  }
+
+  async triggerSos(_location: { latitude: number; longitude: number } | null, _notes?: string): Promise<void> {
+    await delay(null, 500);
+  }
+
+  async submitIncident(_input: IncidentReportInput): Promise<void> {
+    await delay(null, 800);
+  }
+
+  async getRouteForLeg(_leg: DutyRouteLeg): Promise<DutyLegRoute> {
+    // No real geo data on the mock path -- honestly unavailable, never a
+    // plausible-looking demo distance/route.
+    return delay(
+      { available: false, distanceKm: null, durationSeconds: null, routeAvailable: false, fromLocation: null, toLocation: null, geometry: null },
+      400
+    );
   }
 }

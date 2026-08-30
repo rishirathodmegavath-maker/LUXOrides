@@ -24,7 +24,7 @@ interface DutyState {
 export const useDutyStore = create<DutyState>((set) => ({
   online: false,
   todayDuty: null,
-  checklist: { vehicleExteriorUris: [], vehicleInteriorUris: [] },
+  checklist: { vehicleExteriorUris: {}, vehicleInteriorUris: {} },
   readinessStatus: "pending",
   executionToken: null,
   dutyEndResult: null,
@@ -41,7 +41,7 @@ export const useDutyStore = create<DutyState>((set) => ({
     // downstream needs to await the clear completing.
     dutyStorage.clearActiveDuty().catch(() => {});
     set({
-      checklist: { vehicleExteriorUris: [], vehicleInteriorUris: [] },
+      checklist: { vehicleExteriorUris: {}, vehicleInteriorUris: {} },
       readinessStatus: "pending",
       executionToken: null,
       dutyEndResult: null,

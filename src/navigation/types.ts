@@ -56,6 +56,9 @@ export type DutyStackParamList = {
   BackToGarage: undefined;
   GarageMap: undefined;
   DutyClosed: undefined;
+  Sos: undefined;
+  IncidentReport: undefined;
+  IncidentReportConfirmation: undefined;
 };
 
 export type HelpStackParamList = {

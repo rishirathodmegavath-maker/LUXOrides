@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Image, StyleSheet, Text, View } from "react-native";
+import * as Location from "expo-location";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { PermissionKind, PermissionsStackParamList } from "../../navigation/types";
 import { Button, ScreenContainer } from "../../components";
@@ -38,14 +39,22 @@ const COPY: Record<PermissionKind, { illustration: number; title: string; body: 
 // exact copy transcribed from the file's own text nodes, illustrations
 // exported directly from the frames' "Image Container" rectangles. One
 // reusable primer screen driven by `kind`, matching the shared layout.
-// Phase 1 has no location/notification backend to wire real OS permission
-// results into, so "Allow Permission" simply advances the primer sequence.
+//
+// For "location", "Allow Permission" now triggers the real OS foreground
+// prompt (requestForegroundPermissionsAsync) -- previously this button did
+// nothing but advance the wizard regardless of what the driver tapped.
+// Deliberately foreground-only here: requesting background location during
+// onboarding (before a duty exists to justify it) is against both Android
+// and iOS review guidance and would just get auto-denied by the OS on
+// modern versions -- backgroundLocationTask requests that separately, in
+// context, the moment a duty actually starts.
 export function PermissionScreen({ route, navigation }: Props) {
   const { kind } = route.params;
   const copy = COPY[kind];
   const setPermissionsDone = useAuthStore((s) => s.setPermissionsDone);
+  const [requesting, setRequesting] = useState(false);
 
-  const advance = () => {
+  const goNext = () => {
     const idx = ORDER.indexOf(kind);
     if (idx < ORDER.length - 1) {
       navigation.replace("Permission", { kind: ORDER[idx + 1] });
@@ -54,12 +63,26 @@ export function PermissionScreen({ route, navigation }: Props) {
     }
   };
 
+  const onAllow = async () => {
+    if (kind !== "location") {
+      goNext();
+      return;
+    }
+    setRequesting(true);
+    try {
+      await Location.requestForegroundPermissionsAsync();
+    } finally {
+      setRequesting(false);
+      goNext();
+    }
+  };
+
   return (
     <ScreenContainer
       footer={
         <View style={{ gap: spacing.sm }}>
-          <Button label="Allow Permission" onPress={advance} />
-          <Button label="Skip for now" variant="secondary" onPress={advance} />
+          <Button label="Allow Permission" onPress={onAllow} loading={requesting} />
+          <Button label="Skip for now" variant="secondary" onPress={goNext} disabled={requesting} />
         </View>
       }
     >

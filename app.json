@@ -56,9 +56,14 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "LuxoRides Chauffeur uses your location to navigate to pickups and track active duties."
+          "locationWhenInUsePermission": "LuxoRides Chauffeur uses your location to navigate to pickups and track active duties.",
+          "locationAlwaysAndWhenInUsePermission": "LuxoRides Chauffeur uses your location, including while backgrounded, to keep dispatch updated with your live position during an active duty.",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true,
+          "isIosBackgroundLocationEnabled": true
         }
       ],
+      "expo-task-manager",
       "expo-secure-store"
     ],
     "extra": {

@@ -17,7 +17,7 @@ export class MockOnboardingService implements OnboardingService {
     await delay(null, 500);
   }
 
-  async uploadDocument(type: DocumentType, _localUri: string): Promise<{ status: DocumentStatus }> {
+  async uploadDocument(type: DocumentType, _localUri: string, _expiryDate?: string | null): Promise<{ status: DocumentStatus }> {
     this.statuses[type] = "uploading";
     await delay(null, 800);
     this.statuses[type] = "verifying";

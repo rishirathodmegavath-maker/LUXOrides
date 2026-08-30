@@ -43,7 +43,9 @@ export interface DriverProfile {
 export interface OnboardingService {
   saveProfileBasics(input: { name: string; email?: string; experienceYears?: number }): Promise<void>;
   saveGarageLocation(input: { garageName: string; garageAddress: string }): Promise<void>;
-  uploadDocument(type: DocumentType, localUri: string): Promise<{ status: DocumentStatus }>;
+  // expiryDate (ISO date string) is optional -- only meaningful for
+  // documents that actually expire (e.g. a driving licence).
+  uploadDocument(type: DocumentType, localUri: string, expiryDate?: string | null): Promise<{ status: DocumentStatus }>;
   getDocumentStatus(type: DocumentType): Promise<DocumentStatus>;
   submitForApproval(): Promise<void>;
   getApprovalStatus(): Promise<DriverProfile["approvalStatus"]>;
@@ -74,12 +76,32 @@ export interface DutySummary {
   pickup: TripStop;
   dropoff: TripStop;
   clientName: string;
+  clientPhone: string | null;
 }
+
+export type VehicleCondition = "GOOD" | "MINOR_DAMAGE" | "MAJOR_DAMAGE";
+export type Cleanliness = "CLEAN" | "NEEDS_CLEANING";
+export type FuelLevel = "EMPTY" | "QUARTER" | "HALF" | "THREE_QUARTERS" | "FULL";
 
 export interface ReadinessChecklist {
   uniformSelfieUri?: string;
-  vehicleExteriorUris: string[];
-  vehicleInteriorUris: string[];
+  // Angle-keyed (e.g. "Front" -> uri), not a positional array -- a plain
+  // array here previously meant Object.values(uris) returned insertion
+  // order rather than the fixed angle order, silently mislabelling which
+  // photo was which whenever a driver tapped angles out of sequence.
+  vehicleExteriorUris: Record<string, string>;
+  vehicleInteriorUris: Record<string, string>;
+  exteriorCondition?: VehicleCondition;
+  interiorCondition?: VehicleCondition;
+  damageNotes?: string;
+  cleanliness?: Cleanliness;
+  tyreCondition?: VehicleCondition;
+  lightsCondition?: VehicleCondition;
+  fuelLevel?: FuelLevel;
+  // Explicit attestation, separate from "every field happens to be filled"
+  // -- the backend rejects a submission where this isn't true (see
+  // VehicleInspectionService.submitInspection).
+  driverConfirmed?: boolean;
 }
 
 export interface BillBreakdown {
@@ -124,6 +146,15 @@ export interface DutyEndInput extends DutyStartInput {
   expenseAmount?: number;
 }
 
+export type IncidentCategory = "ACCIDENT" | "VEHICLE_BREAKDOWN" | "TRAFFIC_VIOLATION" | "CUSTOMER_DISPUTE" | "OTHER";
+
+export interface IncidentReportInput {
+  category: IncidentCategory;
+  description: string;
+  location: DutyLocationInput;
+  photoUris: string[];
+}
+
 export interface GeoPoint {
   lat: number;
   lng: number;
@@ -158,6 +189,24 @@ export interface FareBreakdown {
   extraTimeRatePerHour: number | null;
   extraTimeCharge: number;
   projectedTotalDurationSeconds: number | null;
+}
+
+export type DutyRouteLeg = "PICKUP" | "DROP" | "GARAGE";
+
+// A real, on-demand route for one garage-to-garage leg
+// (com.core.dtos.driverduty.DutyRouteLegResponse). available=false means the
+// backend has no waypoint to route from/to yet (e.g. no reporting location
+// recorded); routeAvailable=false (with available=true) means a real
+// distance/duration came back but no road geometry did. Never fabricated
+// either way -- render an explicit "unavailable" state rather than guessing.
+export interface DutyLegRoute {
+  available: boolean;
+  distanceKm: number | null;
+  durationSeconds: number | null;
+  routeAvailable: boolean;
+  fromLocation: GeoPoint | null;
+  toLocation: GeoPoint | null;
+  geometry: GeoPoint[] | null;
 }
 
 export interface DutyEndResult {
@@ -207,11 +256,22 @@ export interface DutyService {
   markArrivedAtDropoff(): Promise<void>;
   endDuty(input: DutyEndInput): Promise<DutyEndResult>;
   checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null }>;
-  // location is best-effort -- a missing GPS fix doesn't block the real
-  // backend confirmation, it just leaves the checkpoint flagged
-  // NEEDS_REVIEW server-side.
+  // location is best-effort (same convention as SOS/incident) -- a missing
+  // GPS fix doesn't block the real backend confirmation, it just leaves the
+  // checkpoint flagged NEEDS_REVIEW server-side.
   returnToGarage(location?: DutyLocationInput | null): Promise<void>;
   closeDuty(): Promise<void>;
+  // Both require an active duty's execution token (minted by startDuty) --
+  // there is no backend endpoint for either outside a duty's token window.
+  // SOS deliberately takes a raw coordinate, not a full DutyLocationInput --
+  // it's a raw safety ping with no reverse-geocode step, unlike an incident
+  // report's authored location.
+  triggerSos(location: { latitude: number; longitude: number } | null, notes?: string): Promise<void>;
+  submitIncident(input: IncidentReportInput): Promise<void>;
+  // Real, on-demand route for the given leg -- requires a started duty
+  // (execution token). Never fabricated: an unreachable/unavailable route
+  // comes back as available:false rather than a guessed figure.
+  getRouteForLeg(leg: DutyRouteLeg): Promise<DutyLegRoute>;
 }
 
 export interface PaymentService {

@@ -17,6 +17,7 @@ export interface DutySummaryForDriverDTO {
   bookingId: string;
   status: DutyStatus;
   clientName: string;
+  clientPhone: string | null;
   vehicleName: string;
   vehicleNumber: string;
   reportingLocation: string;
@@ -50,6 +51,7 @@ export interface DriverDutySummaryResponse {
   dutyId: string;
   currentRequiredAction: "START_SUBMISSION" | "END_SUBMISSION" | "COMPLETED";
   clientName: string;
+  clientPhone: string | null;
   driverName: string;
   vehicleName: string;
   vehicleNumber: string;
@@ -177,6 +179,81 @@ export interface DriverDutyEndResponse {
   message: string | null;
 }
 
+// Mirrors com.core.dtos.driverduty.DriverDutyLocationPingRequest /
+// DriverDutyLocationResponse. capturedAt is the device clock at the moment
+// the GPS fix was read, distinct from receivedAt on the backend.
+export interface DriverDutyLocationPingRequest {
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number | null;
+  headingDegrees: number | null;
+  speedMps: number | null;
+  capturedAt: string;
+}
+
+export interface DriverDutyLocationResponse {
+  dutyId: string;
+  latitude: number | null;
+  longitude: number | null;
+  headingDegrees: number | null;
+  capturedAt: string | null;
+}
+
+// Mirrors com.core.dtos.driverduty.DriverDutySosRequest / DriverDutySosResponse.
+export interface DriverDutySosRequest {
+  latitude: number | null;
+  longitude: number | null;
+  capturedAt: string;
+  notes?: string | null;
+}
+
+export interface DriverDutySosResponse {
+  id: string;
+  received: boolean;
+}
+
+export type DriverDutyIncidentCategory =
+  | "ACCIDENT"
+  | "VEHICLE_BREAKDOWN"
+  | "TRAFFIC_VIOLATION"
+  | "CUSTOMER_DISPUTE"
+  | "OTHER";
+
+// Mirrors com.core.dtos.driverduty.DriverDutyIncidentRequest / DriverDutyIncidentResponse.
+export interface DriverDutyIncidentRequest {
+  category: DriverDutyIncidentCategory;
+  description: string;
+  location: AddressSnapshot;
+  submittedAt: string;
+}
+
+export interface DriverDutyIncidentResponse {
+  id: string;
+  received: boolean;
+}
+
+export type VehicleConditionRating = "GOOD" | "MINOR_DAMAGE" | "MAJOR_DAMAGE";
+
+export type CleanlinessRating = "CLEAN" | "NEEDS_CLEANING";
+export type FuelLevel = "EMPTY" | "QUARTER" | "HALF" | "THREE_QUARTERS" | "FULL";
+
+// Mirrors com.core.dtos.driverduty.VehicleInspectionRequest / VehicleInspectionResponse.
+export interface VehicleInspectionRequest {
+  exteriorCondition: VehicleConditionRating;
+  interiorCondition: VehicleConditionRating;
+  damageNotes: string | null;
+  cleanliness: CleanlinessRating;
+  tyreCondition: VehicleConditionRating;
+  lightsCondition: VehicleConditionRating;
+  fuelLevel: FuelLevel | null;
+  driverConfirmed: boolean;
+}
+
+export interface VehicleInspectionResponse {
+  id: string;
+  received: boolean;
+}
+
 // Mirrors com.core.dtos.driverduty.DriverDutyAcceptanceResponse / DriverDutyDeclineRequest / DriverDutyDeclineResponse.
 export interface DriverDutyAcceptanceResponse {
   dutyId: string;
@@ -226,6 +303,22 @@ export interface GarageReturnConfirmationResponse {
 export interface CloseDutyConfirmationResponse {
   closed: boolean;
   closedAt: string | null;
+}
+
+// Mirrors com.core.dtos.driverduty.DutyRouteLegResponse -- a real, on-demand
+// route for one leg of the garage-to-garage duty model, computed the same
+// way as the existing C->A return-leg estimate. geometry is only populated
+// when a real road route came back.
+export interface DutyRouteLegResponse {
+  leg: "PICKUP" | "DROP" | "GARAGE";
+  available: boolean;
+  distanceKm: number | null;
+  durationSeconds: number | null;
+  provider: string | null;
+  routeAvailable: boolean;
+  fromLocation: GeoPoint | null;
+  toLocation: GeoPoint | null;
+  geometry: GeoPoint[] | null;
 }
 
 export interface QrPaymentStatusResponse {

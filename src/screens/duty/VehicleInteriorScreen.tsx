@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
-import { Button, CaptureStatus, PhotoCapture, ScreenContainer, ScreenHeader } from "../../components";
+import { Button, PhotoCapture, ScreenContainer, ScreenHeader } from "../../components";
 import { useDutyStore } from "../../store/dutyStore";
 import { colors, spacing, type } from "../../theme";
 
@@ -11,27 +11,17 @@ type Props = NativeStackScreenProps<DutyStackParamList, "VehicleInterior">;
 const ANGLES = ["Dashboard", "Front Seats", "Back Seats", "Boot Space"] as const;
 
 // Mirrors the Figma "Duty Readiness- Vehicle Interior Page" / "...Photo
-// Page" / "...Interior Error Page" frames (nodes 675:12024, 675:11934,
-// 675:11982) — the same 4-angle grid as Exterior, plus a retake-on-error
-// path driven by the mock upload/verify status.
+// Page" frames (nodes 675:12024, 675:11934) — the same 4-angle grid as
+// Exterior. A driver can always retake any angle before continuing; there
+// is no simulated capture-quality check here (the backend doesn't perform
+// one either), so nothing pretends to validate photo quality.
 export function VehicleInteriorScreen({ navigation }: Props) {
   const [uris, setUris] = useState<Record<string, string>>({});
-  const [failedAngle, setFailedAngle] = useState<string | null>(null);
   const updateChecklist = useDutyStore((s) => s.updateChecklist);
   const allCaptured = ANGLES.every((a) => uris[a]);
 
-  const onCapture = (angle: string, uri: string) => {
-    // Boot Space intentionally demonstrates the failure/retake path once.
-    if (angle === "Boot Space" && !uris[angle] && failedAngle !== angle) {
-      setFailedAngle(angle);
-      return;
-    }
-    setFailedAngle((f) => (f === angle ? null : f));
-    setUris((u) => ({ ...u, [angle]: uri }));
-  };
-
   const onContinue = () => {
-    updateChecklist({ vehicleInteriorUris: Object.values(uris) });
+    updateChecklist({ vehicleInteriorUris: uris });
     navigation.navigate("DutyReadinessSubmit");
   };
 
@@ -42,22 +32,18 @@ export function VehicleInteriorScreen({ navigation }: Props) {
       <Text style={styles.subtitle}>Capture the interior condition of your vehicle.</Text>
 
       <View style={styles.grid}>
-        {ANGLES.map((angle) => {
-          const status: CaptureStatus = failedAngle === angle ? "failed" : uris[angle] ? "verified" : "idle";
-          return (
-            <View key={angle} style={styles.cell}>
-              <Text style={styles.angleLabel}>{angle}</Text>
-              <PhotoCapture
-                uri={uris[angle]}
-                status={status}
-                onCapture={(uri) => onCapture(angle, uri)}
-                label="Tap to capture"
-                errorText={status === "failed" ? "Photo too dark — please retake in better lighting." : undefined}
-                compact
-              />
-            </View>
-          );
-        })}
+        {ANGLES.map((angle) => (
+          <View key={angle} style={styles.cell}>
+            <Text style={styles.angleLabel}>{angle}</Text>
+            <PhotoCapture
+              uri={uris[angle]}
+              status={uris[angle] ? "verified" : "idle"}
+              onCapture={(uri) => setUris((u) => ({ ...u, [angle]: uri }))}
+              label="Tap to capture"
+              compact
+            />
+          </View>
+        ))}
       </View>
     </ScreenContainer>
   );

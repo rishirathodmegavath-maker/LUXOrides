@@ -1,12 +1,20 @@
 import { dutyApi } from "../../api/duty.api";
 import type { AddressSnapshot, DriverDutyExpenseInput, DutySummaryForDriverDTO, PackageFareBreakdown } from "../../api/duty.types";
+import type { FilePart } from "../../api/client";
 import { dutyStorage } from "../../storage/dutyStorage";
+import { assertOnline } from "../../util/network";
 import { useDutyStore } from "../../store/dutyStore";
 import { MockDutyService } from "../mock/mockDuty";
-import { DutyEndInput, DutyEndResult, DutyLocationInput, DutyService, DutyStartInput, DutySummary, FareBreakdown, ReadinessChecklist, TripListItem } from "../types";
+import { DutyEndInput, DutyEndResult, DutyLegRoute, DutyLocationInput, DutyRouteLeg, DutyService, DutyStartInput, DutySummary, FareBreakdown, IncidentReportInput, ReadinessChecklist, TripListItem } from "../types";
 
 function money(dto: DutySummaryForDriverDTO): number | undefined {
   return dto.dutyTotal?.amount;
+}
+
+function tripStatus(status: DutySummaryForDriverDTO["status"]): TripListItem["status"] {
+  if (status === "COMPLETED") return "completed";
+  if (status === "CANCELLED") return "cancelled";
+  return "upcoming";
 }
 
 function toFareBreakdown(dto: PackageFareBreakdown | null): FareBreakdown | null {
@@ -25,12 +33,6 @@ function toFareBreakdown(dto: PackageFareBreakdown | null): FareBreakdown | null
     extraTimeCharge: dto.extraTimeCharge,
     projectedTotalDurationSeconds: dto.projectedTotalDurationSeconds,
   };
-}
-
-function tripStatus(status: DutySummaryForDriverDTO["status"]): TripListItem["status"] {
-  if (status === "COMPLETED") return "completed";
-  if (status === "CANCELLED") return "cancelled";
-  return "upcoming";
 }
 
 function toTripListItem(dto: DutySummaryForDriverDTO): TripListItem {
@@ -75,6 +77,7 @@ export function toDutySummary(dto: DutySummaryForDriverDTO): DutySummary {
     // fabricating a duration the backend doesn't provide.
     durationLabel: "",
     clientName: dto.clientName,
+    clientPhone: dto.clientPhone,
     pickup: { label: "PICKUP", address: dto.reportingLocation, distanceKm: null, etaMinutes: null },
     dropoff: { label: "DROP OFF", address: dto.dropLocation ?? "—", distanceKm: null, etaMinutes: null },
   };
@@ -82,9 +85,9 @@ export function toDutySummary(dto: DutySummaryForDriverDTO): DutySummary {
 
 // Phase 1: accept/decline, pickup OTP, return-to-garage, and close-duty are
 // all now real, backend-authoritative calls (DriverAppController /
-// ExternalDriverDutyController). Pre-duty readiness (submitReadiness/
-// getReadinessStatus) is out of this phase's scope and still delegates to
-// the mock.
+// ExternalDriverDutyController) — only pre-duty readiness-status polling
+// (unused by the UI, submitReadiness itself is already real) and pickup-OTP
+// verification's UI plumbing still route through the mock's shape.
 export class FleetovoDutyService implements DutyService {
   private mock = new MockDutyService();
 
@@ -109,15 +112,80 @@ export class FleetovoDutyService implements DutyService {
   }
 
   async acceptDuty(dutyId: string): Promise<void> {
+    await assertOnline();
     await dutyApi.acceptDuty(dutyId);
   }
 
   async declineDuty(dutyId: string, reason: string): Promise<void> {
+    await assertOnline();
     await dutyApi.declineDuty(dutyId, { reason });
   }
 
-  submitReadiness(checklist: ReadinessChecklist): Promise<void> {
-    return this.mock.submitReadiness(checklist);
+  // Structured inspection submission (VehicleInspectionService,
+  // /driver/app/duties/{dutyId}/inspection) -- the backend independently
+  // enforces every condition rating, driverConfirmed, and all 8 photos, so
+  // this client-side check is a fast-fail, not the actual authority.
+  // readinessStatus itself stays driven by the mock (see submitReadiness's
+  // own store update in DutyReadinessSubmitScreen) -- there's no backend
+  // concept of an approval workflow for it yet.
+  async submitReadiness(checklist: ReadinessChecklist): Promise<void> {
+    await assertOnline();
+    const todayDuty = useDutyStore.getState().todayDuty;
+    if (!todayDuty) {
+      throw new Error("No active duty to submit readiness for.");
+    }
+    if (
+      !checklist.exteriorCondition ||
+      !checklist.interiorCondition ||
+      !checklist.cleanliness ||
+      !checklist.tyreCondition ||
+      !checklist.lightsCondition ||
+      !checklist.driverConfirmed
+    ) {
+      throw new Error("All condition ratings and driver confirmation are required.");
+    }
+
+    const exteriorFieldByAngle: Record<string, string> = {
+      Front: "exteriorFront",
+      Back: "exteriorBack",
+      "Left Side": "exteriorLeft",
+      "Right Side": "exteriorRight",
+    };
+    const interiorFieldByAngle: Record<string, string> = {
+      Dashboard: "interiorDashboard",
+      "Front Seats": "interiorFrontSeats",
+      "Back Seats": "interiorBackSeats",
+      "Boot Space": "interiorBootSpace",
+    };
+
+    const photos: Record<string, FilePart> = {};
+    for (const [angle, uri] of Object.entries(checklist.vehicleExteriorUris)) {
+      const field = exteriorFieldByAngle[angle];
+      if (field && uri) {
+        photos[field] = { uri, name: `${field}.jpg`, type: "image/jpeg" };
+      }
+    }
+    for (const [angle, uri] of Object.entries(checklist.vehicleInteriorUris)) {
+      const field = interiorFieldByAngle[angle];
+      if (field && uri) {
+        photos[field] = { uri, name: `${field}.jpg`, type: "image/jpeg" };
+      }
+    }
+
+    await dutyApi.submitInspection(
+      todayDuty.id,
+      {
+        exteriorCondition: checklist.exteriorCondition,
+        interiorCondition: checklist.interiorCondition,
+        damageNotes: checklist.damageNotes ?? null,
+        cleanliness: checklist.cleanliness,
+        tyreCondition: checklist.tyreCondition,
+        lightsCondition: checklist.lightsCondition,
+        fuelLevel: checklist.fuelLevel ?? null,
+        driverConfirmed: checklist.driverConfirmed,
+      },
+      photos
+    );
   }
 
   getReadinessStatus(): Promise<"pending" | "submitted" | "approved"> {
@@ -129,6 +197,7 @@ export class FleetovoDutyService implements DutyService {
   // driver's active list (getTodayDuty/getTrips) to have a real dutyId to
   // mint a token for.
   async startDuty(input: DutyStartInput): Promise<void> {
+    await assertOnline();
     const todayDuty = useDutyStore.getState().todayDuty;
     if (!todayDuty) {
       throw new Error("No active duty to start.");
@@ -161,6 +230,7 @@ export class FleetovoDutyService implements DutyService {
   }
 
   async verifyPickupOtp(code: string): Promise<void> {
+    await assertOnline();
     const token = useDutyStore.getState().executionToken;
     if (!token) {
       throw new Error("No active duty — pickup OTP requires a started duty.");
@@ -173,6 +243,7 @@ export class FleetovoDutyService implements DutyService {
   }
 
   async endDuty(input: DutyEndInput): Promise<DutyEndResult> {
+    await assertOnline();
     const token = useDutyStore.getState().executionToken;
     if (!token) {
       throw new Error("Duty was never started — nothing to end.");
@@ -230,6 +301,7 @@ export class FleetovoDutyService implements DutyService {
   }
 
   async returnToGarage(location?: DutyLocationInput | null): Promise<void> {
+    await assertOnline();
     const token = useDutyStore.getState().executionToken;
     if (!token) {
       throw new Error("No active duty — return-to-garage requires a completed duty.");
@@ -247,10 +319,65 @@ export class FleetovoDutyService implements DutyService {
   }
 
   async closeDuty(): Promise<void> {
+    await assertOnline();
     const token = useDutyStore.getState().executionToken;
     if (!token) {
       throw new Error("No active duty — close-duty requires a completed duty.");
     }
     await dutyApi.closeDuty(token);
+  }
+
+  async triggerSos(location: { latitude: number; longitude: number } | null, notes?: string): Promise<void> {
+    await assertOnline();
+    const token = useDutyStore.getState().executionToken;
+    if (!token) {
+      throw new Error("No active duty — SOS requires a started duty.");
+    }
+    await dutyApi.submitSos(token, {
+      latitude: location?.latitude ?? null,
+      longitude: location?.longitude ?? null,
+      capturedAt: new Date().toISOString(),
+      notes: notes ?? null,
+    });
+  }
+
+  async submitIncident(input: IncidentReportInput): Promise<void> {
+    await assertOnline();
+    const token = useDutyStore.getState().executionToken;
+    if (!token) {
+      throw new Error("No active duty — incident reporting requires a started duty.");
+    }
+    const photos: FilePart[] = input.photoUris.map((uri, index) => ({
+      uri,
+      name: `incident-${index + 1}.jpg`,
+      type: "image/jpeg",
+    }));
+    await dutyApi.submitIncident(
+      token,
+      {
+        category: input.category,
+        description: input.description,
+        location: toAddressSnapshot(input.location),
+        submittedAt: new Date().toISOString(),
+      },
+      photos
+    );
+  }
+
+  async getRouteForLeg(leg: DutyRouteLeg): Promise<DutyLegRoute> {
+    const token = useDutyStore.getState().executionToken;
+    if (!token) {
+      return { available: false, distanceKm: null, durationSeconds: null, routeAvailable: false, fromLocation: null, toLocation: null, geometry: null };
+    }
+    const res = await dutyApi.getRouteForLeg(token, leg);
+    return {
+      available: res.available,
+      distanceKm: res.distanceKm,
+      durationSeconds: res.durationSeconds,
+      routeAvailable: res.routeAvailable,
+      fromLocation: res.fromLocation,
+      toLocation: res.toLocation,
+      geometry: res.geometry,
+    };
   }
 }

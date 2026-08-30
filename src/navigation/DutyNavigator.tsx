@@ -22,10 +22,16 @@ import { DutyCompletionSlipScreen } from "../screens/duty/DutyCompletionSlipScre
 import { BackToGarageScreen } from "../screens/duty/BackToGarageScreen";
 import { GarageMapScreen } from "../screens/duty/GarageMapScreen";
 import { DutyClosedScreen } from "../screens/duty/DutyClosedScreen";
+import { SosScreen } from "../screens/duty/SosScreen";
+import { IncidentReportScreen } from "../screens/duty/IncidentReportScreen";
+import { IncidentReportConfirmationScreen } from "../screens/duty/IncidentReportConfirmationScreen";
+import { useDutyLocationReporter } from "../hooks/useDutyLocationReporter";
 
 const Stack = createNativeStackNavigator<DutyStackParamList>();
 
 export function DutyNavigator() {
+  useDutyLocationReporter();
+
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="AcceptDuty">
       <Stack.Screen name="AcceptDuty" component={AcceptDutyScreen} />
@@ -49,6 +55,9 @@ export function DutyNavigator() {
       <Stack.Screen name="BackToGarage" component={BackToGarageScreen} />
       <Stack.Screen name="GarageMap" component={GarageMapScreen} />
       <Stack.Screen name="DutyClosed" component={DutyClosedScreen} />
+      <Stack.Screen name="Sos" component={SosScreen} />
+      <Stack.Screen name="IncidentReport" component={IncidentReportScreen} />
+      <Stack.Screen name="IncidentReportConfirmation" component={IncidentReportConfirmationScreen} />
     </Stack.Navigator>
   );
 }

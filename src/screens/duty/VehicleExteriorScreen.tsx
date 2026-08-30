@@ -18,7 +18,7 @@ export function VehicleExteriorScreen({ navigation }: Props) {
   const allCaptured = ANGLES.every((a) => uris[a]);
 
   const onContinue = () => {
-    updateChecklist({ vehicleExteriorUris: Object.values(uris) });
+    updateChecklist({ vehicleExteriorUris: uris });
     navigation.navigate("VehicleInterior");
   };
 

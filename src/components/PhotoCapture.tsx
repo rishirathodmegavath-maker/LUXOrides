@@ -31,7 +31,18 @@ const STATUS_COPY: Record<CaptureStatus, { text: string; color: string } | null>
 export function PhotoCapture({ uri, status, onCapture, label = "Tap to take a photo", errorText, aspect = [4, 3], compact }: PhotoCaptureProps) {
   const copy = STATUS_COPY[status];
 
+  // Upload is in flight for the duration of "uploading" (onCapture's own
+  // await, set by every screen before calling it) -- disabling the trigger
+  // for exactly that window, and no longer, is what prevents a double-tap/
+  // fast-retry from firing a second concurrent upload of the same photo
+  // while still letting a driver freely retake after "failed", or retake a
+  // "verifying"/"verified" photo (neither is an in-flight request).
+  const uploadInFlight = status === "uploading";
+
   const pick = async () => {
+    if (uploadInFlight) {
+      return;
+    }
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     const result = permission.granted
       ? await ImagePicker.launchCameraAsync({ quality: 0.7, aspect, allowsEditing: true })
@@ -43,7 +54,11 @@ export function PhotoCapture({ uri, status, onCapture, label = "Tap to take a ph
 
   return (
     <View>
-      <Pressable style={[styles.frame, compact && styles.frameCompact, status === "failed" && styles.frameError]} onPress={pick}>
+      <Pressable
+        disabled={uploadInFlight}
+        style={[styles.frame, compact && styles.frameCompact, status === "failed" && styles.frameError]}
+        onPress={pick}
+      >
         {uri ? (
           <Image source={{ uri }} style={styles.image} resizeMode="cover" />
         ) : (

@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { PermissionKind, PermissionsStackParamList } from "../../navigation/types";
 import { Button, ScreenContainer } from "../../components";
 import { useAuthStore } from "../../store/authStore";
+import { requestNotificationPermissionAndRegister } from "../../services/notifications/pushNotifications";
 import { colors, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<PermissionsStackParamList, "Permission">;
@@ -48,6 +49,13 @@ const COPY: Record<PermissionKind, { illustration: number; title: string; body: 
 // and iOS review guidance and would just get auto-denied by the OS on
 // modern versions -- backgroundLocationTask requests that separately, in
 // context, the moment a duty actually starts.
+//
+// For "notifications", "Allow Permission" requests real OS notification
+// permission and, on grant, registers this device for duty-assignment push
+// (see pushNotifications.ts) -- previously this step was entirely cosmetic
+// and never called any OS API. A denial never blocks onboarding: the app
+// works identically either way via the existing focus/reconnect
+// reconciliation, which push is only ever a faster wake signal for.
 export function PermissionScreen({ route, navigation }: Props) {
   const { kind } = route.params;
   const copy = COPY[kind];
@@ -64,13 +72,21 @@ export function PermissionScreen({ route, navigation }: Props) {
   };
 
   const onAllow = async () => {
-    if (kind !== "location") {
+    if (kind !== "location" && kind !== "notifications") {
       goNext();
       return;
     }
     setRequesting(true);
     try {
-      await Location.requestForegroundPermissionsAsync();
+      if (kind === "location") {
+        await Location.requestForegroundPermissionsAsync();
+      } else {
+        // Best-effort by design (see requestNotificationPermissionAndRegister)
+        // -- a denial or failure here must never block onboarding; the
+        // driver still gets duty updates via the existing focus/reconnect
+        // reconciliation regardless.
+        await requestNotificationPermissionAndRegister();
+      }
     } finally {
       setRequesting(false);
       goNext();

@@ -1,4 +1,4 @@
-import { DutyEndInput, DutyEndResult, DutyLegRoute, DutyLocationInput, DutyRouteLeg, DutyService, DutyStartInput, DutySummary, IncidentReportInput, ReadinessChecklist, TripListItem } from "../types";
+import { CashPaymentResult, DutyEndInput, DutyEndResult, DutyLegRoute, DutyLocationInput, DutyRouteLeg, DutyService, DutyStartInput, DutySummary, IncidentReportInput, ReadinessChecklist, TripListItem } from "../types";
 import { delay } from "./utils";
 
 const TRIPS: TripListItem[] = [
@@ -132,6 +132,10 @@ export class MockDutyService implements DutyService {
 
   async checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null }> {
     return delay({ paid: true, status: "PAID", amount: null, qrImageUrl: null }, 800);
+  }
+
+  async confirmCashPayment(): Promise<CashPaymentResult> {
+    return delay({ confirmed: true, amount: 4200, message: "Cash payment recorded" }, 600);
   }
 
   async returnToGarage(_location?: DutyLocationInput | null): Promise<void> {

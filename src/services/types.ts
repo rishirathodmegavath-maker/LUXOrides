@@ -256,6 +256,12 @@ export interface DutyService {
   markArrivedAtDropoff(): Promise<void>;
   endDuty(input: DutyEndInput): Promise<DutyEndResult>;
   checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null }>;
+  // Records a real, backend-authoritative cash payment for the active duty --
+  // no amount is passed in: the backend derives and validates the
+  // outstanding payable amount itself (see FleetovoDutyService). Safe to
+  // call more than once for the same duty; the backend returns the same
+  // confirmed result rather than creating a duplicate.
+  confirmCashPayment(): Promise<CashPaymentResult>;
   // location is best-effort (same convention as SOS/incident) -- a missing
   // GPS fix doesn't block the real backend confirmation, it just leaves the
   // checkpoint flagged NEEDS_REVIEW server-side.
@@ -274,10 +280,15 @@ export interface DutyService {
   getRouteForLeg(leg: DutyRouteLeg): Promise<DutyLegRoute>;
 }
 
+export interface CashPaymentResult {
+  confirmed: boolean;
+  amount: number;
+  message: string | null;
+}
+
 export interface PaymentService {
   getBill(dutyId: string): Promise<BillBreakdown>;
   getQrPaymentInfo(): Promise<{ upiId: string; qrPayload: string }>;
-  confirmCashPayment(amount: number): Promise<void>;
 }
 
 export interface FaqItem {

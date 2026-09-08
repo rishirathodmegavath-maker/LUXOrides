@@ -31,8 +31,4 @@ export class MockPaymentService implements PaymentService {
   async getQrPaymentInfo(): Promise<{ upiId: string; qrPayload: string }> {
     return delay({ upiId: "123XXXXXXX@paytm", qrPayload: "upi://pay?pa=luxorides@paytm&pn=LuxoRides" }, 300);
   }
-
-  async confirmCashPayment(_amount: number): Promise<void> {
-    await delay(null, 600);
-  }
 }

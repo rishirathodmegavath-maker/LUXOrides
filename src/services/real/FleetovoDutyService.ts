@@ -5,7 +5,7 @@ import { dutyStorage } from "../../storage/dutyStorage";
 import { assertOnline } from "../../util/network";
 import { useDutyStore } from "../../store/dutyStore";
 import { MockDutyService } from "../mock/mockDuty";
-import { DutyEndInput, DutyEndResult, DutyLegRoute, DutyLocationInput, DutyRouteLeg, DutyService, DutyStartInput, DutySummary, FareBreakdown, IncidentReportInput, ReadinessChecklist, TripListItem } from "../types";
+import { CashPaymentResult, DutyEndInput, DutyEndResult, DutyLegRoute, DutyLocationInput, DutyRouteLeg, DutyService, DutyStartInput, DutySummary, FareBreakdown, IncidentReportInput, ReadinessChecklist, TripListItem } from "../types";
 
 function money(dto: DutySummaryForDriverDTO): number | undefined {
   return dto.dutyTotal?.amount;
@@ -298,6 +298,21 @@ export class FleetovoDutyService implements DutyService {
     // exists in the store (only the execution token was restored) — this
     // endpoint is the one place that still has them after a restart.
     return { paid: res.paid, status: res.status, amount: res.amount, qrImageUrl: res.qrImageUrl };
+  }
+
+  // P0 revenue-integrity fix -- previously MockPaymentService.confirmCashPayment
+  // (a local delay, no backend call at all). Never sends an amount: the
+  // backend derives and validates the outstanding payable amount itself, and
+  // the call is safe to retry (same confirmed result comes back, not a
+  // duplicate) -- see ExternalDriverDutyService.confirmCashPayment.
+  async confirmCashPayment(): Promise<CashPaymentResult> {
+    await assertOnline();
+    const token = useDutyStore.getState().executionToken;
+    if (!token) {
+      throw new Error("No active duty — cash confirmation requires a completed duty.");
+    }
+    const res = await dutyApi.confirmCashPayment(token);
+    return { confirmed: res.confirmed, amount: res.amount, message: res.message };
   }
 
   async returnToGarage(location?: DutyLocationInput | null): Promise<void> {

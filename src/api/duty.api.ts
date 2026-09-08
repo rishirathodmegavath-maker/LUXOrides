@@ -1,5 +1,6 @@
 import { privateApi, tokenApi, type FilePart } from "./client";
 import type {
+  CashPaymentConfirmationResponse,
   CloseDutyConfirmationResponse,
   DriverAppDutyTokenResponse,
   DriverDutyAcceptanceResponse,
@@ -74,6 +75,12 @@ export const dutyApi = {
 
   checkQrPaymentStatus(token: string): Promise<QrPaymentStatusResponse> {
     return tokenApi.get<QrPaymentStatusResponse>(`/driver-api/duty/${token}/payment-status`);
+  },
+
+  // No request body -- the backend derives the authoritative outstanding
+  // amount itself; there is nothing for the client to submit.
+  confirmCashPayment(token: string): Promise<CashPaymentConfirmationResponse> {
+    return tokenApi.post<CashPaymentConfirmationResponse>(`/driver-api/duty/${token}/cash/confirm`);
   },
 
   getRouteForLeg(token: string, leg: "PICKUP" | "DROP" | "GARAGE"): Promise<DutyRouteLegResponse> {

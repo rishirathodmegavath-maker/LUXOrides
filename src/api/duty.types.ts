@@ -331,3 +331,14 @@ export interface QrPaymentStatusResponse {
   paidAt: string | null;
   message: string | null;
 }
+
+// Mirrors com.core.dtos.driverduty.CashPaymentConfirmationResponse. amount is
+// always the backend's own derived figure -- this endpoint takes no request
+// body, there is nothing for the client to submit for it to trust.
+export interface CashPaymentConfirmationResponse {
+  confirmed: boolean;
+  paymentId: string | null;
+  amount: number;
+  confirmedAt: string | null;
+  message: string | null;
+}

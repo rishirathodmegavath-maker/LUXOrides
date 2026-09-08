@@ -1,4 +1,3 @@
-import { MockPaymentService } from "./mock/mockPayment";
 import { MockSupportService } from "./mock/mockSupport";
 import { FleetovoAuthService } from "./real/FleetovoAuthService";
 import { FleetovoDriverService } from "./real/FleetovoDriverService";
@@ -9,14 +8,15 @@ import {
   DriverServiceApi,
   DutyService,
   OnboardingService,
-  PaymentService,
   SupportService,
 } from "./types";
 
 // Auth, driver session, onboarding documents, and duty list/detail +
-// execution are wired to the real Fleetovo backend; payment and support
-// stay on mocks until their own integration day. Swapping any of them later
-// means implementing the same interface (see ./types) and changing only the
+// execution are wired to the real Fleetovo backend; support stays on a mock
+// until its own integration day (P1: the dead MockPaymentService/
+// MockAuthService/MockDriverService were removed entirely — nothing in the
+// real wiring ever routed through them). Swapping any of them later means
+// implementing the same interface (see ./types) and changing only the
 // instantiation below, no screen/component code needs to change. Exports
 // are explicitly typed as the interface (not the concrete class) so call
 // sites only ever depend on the contract.
@@ -30,7 +30,6 @@ export const onboardingService: OnboardingService = new FleetovoOnboardingServic
 // backend; readiness/accept-decline/pickup-OTP/start/end still delegate to
 // the mock internally — see FleetovoDutyService's own comment.
 export const dutyService: DutyService = new FleetovoDutyService();
-export const paymentService: PaymentService = new MockPaymentService();
 export const supportService: SupportService = new MockSupportService();
 
 export * from "./types";

@@ -14,13 +14,17 @@ const hero = require("../../../assets/brand/photo_login_hero.png");
 export function LoginScreen({ navigation }: Props) {
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>();
   const canSubmit = phone.length === 10;
 
   const onSubmit = async () => {
+    setError(undefined);
     setLoading(true);
     try {
       await authService.sendOtp(phone);
       navigation.navigate("Otp", { phone });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't send the code. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -39,10 +43,14 @@ export function LoginScreen({ navigation }: Props) {
         <TextField
           label="Mobile Number"
           value={phone}
-          onChangeText={(t) => setPhone(t.replace(/[^0-9]/g, "").slice(0, 10))}
+          onChangeText={(t) => {
+            setPhone(t.replace(/[^0-9]/g, "").slice(0, 10));
+            if (error) setError(undefined);
+          }}
           keyboardType="number-pad"
           placeholder="Enter your Phone Number"
           leftAdornment={<Text style={styles.prefix}>+91</Text>}
+          errorText={error}
         />
       </View>
 

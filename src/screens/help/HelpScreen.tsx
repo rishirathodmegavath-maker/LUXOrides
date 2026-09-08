@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Linking, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { HelpStackParamList } from "../../navigation/types";
@@ -7,6 +7,12 @@ import { ListRow, ScreenContainer, ScreenHeader } from "../../components";
 import { colors, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<HelpStackParamList, "Help">;
+
+// The only support number the app has to offer -- reused for both the
+// display text and the dialer, never a second/different number invented
+// for the tel: link.
+const SUPPORT_PHONE_DISPLAY = "+91 1800-123-4567";
+const SUPPORT_PHONE_TEL = "tel:18001234567";
 
 // Mirrors the Figma "Help Page" frame (node 675:13614).
 export function HelpScreen({ navigation }: Props) {
@@ -32,7 +38,8 @@ export function HelpScreen({ navigation }: Props) {
       <ListRow
         icon={<Feather name="phone-call" size={20} color={colors.textPrimary} />}
         title="Call Support"
-        subtitle="+91 1800-123-4567"
+        subtitle={SUPPORT_PHONE_DISPLAY}
+        onPress={() => Linking.openURL(SUPPORT_PHONE_TEL)}
       />
     </ScreenContainer>
   );

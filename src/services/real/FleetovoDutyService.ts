@@ -78,6 +78,7 @@ export function toDutySummary(dto: DutySummaryForDriverDTO): DutySummary {
     durationLabel: "",
     clientName: dto.clientName,
     clientPhone: dto.clientPhone,
+    driverAcceptedAt: dto.driverAcceptedAt,
     pickup: { label: "PICKUP", address: dto.reportingLocation, distanceKm: null, etaMinutes: null },
     dropoff: { label: "DROP OFF", address: dto.dropLocation ?? "—", distanceKm: null, etaMinutes: null },
   };
@@ -135,6 +136,7 @@ export class FleetovoDutyService implements DutyService {
       throw new Error("No active duty to submit readiness for.");
     }
     if (
+      !checklist.uniformSelfieUri ||
       !checklist.exteriorCondition ||
       !checklist.interiorCondition ||
       !checklist.cleanliness ||
@@ -142,7 +144,7 @@ export class FleetovoDutyService implements DutyService {
       !checklist.lightsCondition ||
       !checklist.driverConfirmed
     ) {
-      throw new Error("All condition ratings and driver confirmation are required.");
+      throw new Error("All condition ratings, the uniform selfie, and driver confirmation are required.");
     }
 
     const exteriorFieldByAngle: Record<string, string> = {
@@ -158,7 +160,9 @@ export class FleetovoDutyService implements DutyService {
       "Boot Space": "interiorBootSpace",
     };
 
-    const photos: Record<string, FilePart> = {};
+    const photos: Record<string, FilePart> = {
+      uniformSelfie: { uri: checklist.uniformSelfieUri, name: "uniformSelfie.jpg", type: "image/jpeg" },
+    };
     for (const [angle, uri] of Object.entries(checklist.vehicleExteriorUris)) {
       const field = exteriorFieldByAngle[angle];
       if (field && uri) {

@@ -1,5 +1,5 @@
 import React from "react";
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, Share, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { colors, radius, spacing, type } from "../theme";
 import { Button } from "./Button";
@@ -15,6 +15,21 @@ export interface QrPaymentCardProps {
 // a real qrCodeUrl is available (from endDuty's PaymentInstruction) it
 // renders that image; otherwise falls back to the placeholder frame.
 export function QrPaymentCard({ qrCodeUrl, amount, paid }: QrPaymentCardProps) {
+  // Reuses the QR/amount already loaded into this screen -- never triggers
+  // a second QR/payment-status request just to share what's already shown.
+  const onShare = async () => {
+    if (!qrCodeUrl) return;
+    const amountText = amount != null ? `₹${amount.toLocaleString("en-IN")}` : "the amount shown";
+    try {
+      await Share.share({
+        message: `Scan this QR code to pay ${amountText} for your LuxoRides trip: ${qrCodeUrl}`,
+        url: qrCodeUrl,
+      });
+    } catch {
+      // Share sheet dismissed/failed -- nothing to recover, the QR itself is still visible on screen.
+    }
+  };
+
   return (
     <View>
       <View style={[styles.notice, paid && styles.noticePaid]}>
@@ -45,7 +60,13 @@ export function QrPaymentCard({ qrCodeUrl, amount, paid }: QrPaymentCardProps) {
       </View>
       <Text style={styles.qrCaption}>Ask the client to scan this QR code and complete the payment.</Text>
 
-      <Button label="Share QR Code" variant="secondary" leadingIcon={<Feather name="share" size={18} color={colors.primary} />} />
+      <Button
+        label="Share QR Code"
+        variant="secondary"
+        leadingIcon={<Feather name="share" size={18} color={colors.primary} />}
+        onPress={onShare}
+        disabled={!qrCodeUrl}
+      />
     </View>
   );
 }

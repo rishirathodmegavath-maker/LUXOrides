@@ -23,8 +23,19 @@ export function AcceptDutyScreen({ navigation }: Props) {
   useEffect(() => {
     if (!todayDuty) {
       dutyService.getTodayDuty().then(setTodayDuty);
+      return;
     }
-  }, [todayDuty, setTodayDuty]);
+    // Restart-resume gap fix: a duty accepted before the app was killed has
+    // no persisted execution token yet (that's only written right before
+    // /start), so reconcileActiveDuty has nothing to resume into and Home
+    // routes back into this screen. Re-offering Accept/Decline for an
+    // already-accepted duty would be confusing (and re-declining makes no
+    // sense) — the backend's own driverAcceptedAt is the authority here, so
+    // skip straight to the same next screen a fresh Accept tap would reach.
+    if (todayDuty.driverAcceptedAt) {
+      navigation.replace("UniformSelfie");
+    }
+  }, [todayDuty, setTodayDuty, navigation]);
 
   const onAccept = async () => {
     if (!todayDuty) return;

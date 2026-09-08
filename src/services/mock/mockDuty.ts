@@ -50,6 +50,7 @@ const TODAY_DUTY: DutySummary = {
   durationLabel: "4Hours/ 40Kms",
   clientName: "Aditya Sharma",
   clientPhone: "+919876543210",
+  driverAcceptedAt: null,
   pickup: {
     label: "PICKUP",
     address: "The Leela Palace, Diplomatic Enclave, Chanakyapuri, Delhi- 110023",

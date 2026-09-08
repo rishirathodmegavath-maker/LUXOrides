@@ -4,6 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
 import { Button, Card, ScreenContainer, ScreenHeader } from "../../components";
+import { useDutyStore } from "../../store/dutyStore";
 import { colors, radius, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<DutyStackParamList, "DutyCompletionSlip">;
@@ -13,6 +14,7 @@ type Props = NativeStackScreenProps<DutyStackParamList, "DutyCompletionSlip">;
 // sitemap's "Client signs digital slip confirming trip complete".
 export function DutyCompletionSlipScreen({ navigation }: Props) {
   const [signed, setSigned] = useState(false);
+  const clientName = useDutyStore((s) => s.todayDuty?.clientName);
 
   return (
     <ScreenContainer footer={<Button label="Confirm & Close Trip" onPress={() => navigation.navigate("BackToGarage")} disabled={!signed} />}>
@@ -21,7 +23,7 @@ export function DutyCompletionSlipScreen({ navigation }: Props) {
 
       <Card style={{ marginTop: spacing.xl }}>
         <Text style={styles.rowLabel}>Client Name</Text>
-        <Text style={styles.rowValue}>Aditya Sharma</Text>
+        <Text style={styles.rowValue}>{clientName || "Unavailable"}</Text>
         <View style={styles.divider} />
         <Text style={styles.rowLabel}>Trip Status</Text>
         <Text style={styles.rowValue}>Completed</Text>

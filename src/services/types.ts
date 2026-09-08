@@ -77,6 +77,11 @@ export interface DutySummary {
   dropoff: TripStop;
   clientName: string;
   clientPhone: string | null;
+  // Backend's own record of driver acceptance (DutySummaryForDriverDTO) --
+  // lets AcceptDutyScreen skip re-offering Accept/Decline for a duty that
+  // was already accepted before an app restart, rather than inferring
+  // acceptance from local navigation history.
+  driverAcceptedAt: string | null;
 }
 
 export type VehicleCondition = "GOOD" | "MINOR_DAMAGE" | "MAJOR_DAMAGE";

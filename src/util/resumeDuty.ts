@@ -3,7 +3,7 @@ import { toDutySummary } from "../services/real/FleetovoDutyService";
 import { dutyStorage } from "../storage/dutyStorage";
 import { useDutyStore } from "../store/dutyStore";
 
-export type DutyResumeTarget = "DropOff" | "PaymentQr" | "GarageMap";
+export type DutyResumeTarget = "PickupOtp" | "DropOff" | "PaymentQr" | "GarageMap";
 
 /*
  * Reconciles a persisted execution token against the real Fleetovo endpoint
@@ -51,7 +51,13 @@ export async function reconcileActiveDuty(): Promise<DutyResumeTarget | null> {
   useDutyStore.getState().setExecutionToken(persisted.executionToken);
   useDutyStore.getState().setTodayDuty(toDutySummary(dto));
 
-  if (!dto.endAt) return "DropOff";
+  // pickupOtpVerifiedAt is the backend's own authoritative record, never
+  // inferred from endAt/local navigation/last-visited-screen state -- a
+  // driver whose duty was interrupted before pickup verification must
+  // resume back into that step, never straight into the trip/drop-off
+  // flow (the backend now rejects /end for exactly this reason too, see
+  // ExternalDriverDutyService.completeDutyEntryAndFinalizeBooking).
+  if (!dto.endAt) return dto.pickupOtpVerifiedAt ? "DropOff" : "PickupOtp";
 
   // Fully closed (real backend confirmation, not local state) -- nothing
   // left to resume into. The duty already shows up in history.

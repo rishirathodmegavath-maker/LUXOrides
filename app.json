@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.luxorides.chauffeur"
+      "bundleIdentifier": "com.luxorides.chauffeur",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.luxorides.chauffeur",

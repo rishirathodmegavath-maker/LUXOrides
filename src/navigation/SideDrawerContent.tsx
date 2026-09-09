@@ -1,5 +1,6 @@
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import type { DrawerContentComponentProps } from "@react-navigation/drawer";
 import { BrandWordmark, ListRow, QrPaymentCard } from "../components";
@@ -9,9 +10,10 @@ import { colors, spacing, type } from "../theme";
 // 671:10174): dark navy header with the brand wordmark, the QR payment
 // panel, then Help/Privacy/Terms/About rows and a footer wordmark.
 export function SideDrawerContent({ navigation }: DrawerContentComponentProps) {
+  const insets = useSafeAreaInsets();
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.xl }]}>
         <BrandWordmark variant="light" size="sm" />
       </View>
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
@@ -55,7 +57,7 @@ export function SideDrawerContent({ navigation }: DrawerContentComponentProps) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
-  header: { backgroundColor: colors.primary, paddingTop: 64, paddingBottom: spacing.xl, alignItems: "center" },
+  header: { backgroundColor: colors.primary, paddingBottom: spacing.xl, alignItems: "center" },
   body: { padding: spacing.lg },
   footer: { alignItems: "center", marginTop: spacing.xxl },
   footerVersion: { ...type.caption, color: colors.textMuted, marginTop: spacing.xs },

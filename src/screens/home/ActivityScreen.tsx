@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from "react";
 import { FlatList, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
@@ -18,6 +19,7 @@ type Props = BottomTabScreenProps<MainTabParamList, "Activity">;
 // the fidelity report.
 export function ActivityScreen(_props: Props) {
   const [trips, setTrips] = useState<TripListItem[]>([]);
+  const insets = useSafeAreaInsets();
 
   useFocusEffect(
     useCallback(() => {
@@ -28,7 +30,7 @@ export function ActivityScreen(_props: Props) {
   const totalEarnings = trips.reduce((sum, t) => sum + (t.fare ?? 0), 0);
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top + spacing.md }]}>
       <Text style={styles.title}>Activity</Text>
       <FlatList
         data={trips}
@@ -60,7 +62,7 @@ export function ActivityScreen(_props: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background, paddingTop: 56 },
+  root: { flex: 1, backgroundColor: colors.background },
   title: { ...type.h1, color: colors.textPrimary, paddingHorizontal: spacing.lg },
   summaryLabel: { ...type.body2, color: colors.textSecondary },
   summaryValue: { ...type.display, color: colors.textPrimary, marginTop: spacing.xxs },

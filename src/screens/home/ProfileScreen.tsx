@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import type { CompositeScreenProps } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
@@ -23,6 +24,7 @@ type Props = CompositeScreenProps<
 export function ProfileScreen({ navigation }: Props) {
   const [profile, setProfile] = useState<DriverProfile | null>(null);
   const reset = useAuthStore((s) => s.reset);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     driverService.getProfile().then(setProfile);
@@ -34,7 +36,7 @@ export function ProfileScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { paddingTop: insets.top + spacing.md }]}>
       <Text style={styles.title}>Profile</Text>
 
       <Card style={styles.identityCard}>
@@ -85,7 +87,7 @@ export function ProfileScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background, paddingTop: 56, padding: spacing.lg },
+  root: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
   title: { ...type.h1, color: colors.textPrimary, marginBottom: spacing.lg },
   identityCard: { alignItems: "center" },
   avatar: {

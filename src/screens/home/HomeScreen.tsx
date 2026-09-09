@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { DrawerActions, useFocusEffect } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
@@ -37,6 +38,7 @@ export function HomeScreen({ navigation }: Props) {
   const setTodayDuty = useDutyStore((s) => s.setTodayDuty);
   const [driverName, setDriverName] = React.useState<string | null>(null);
   const [resumeTarget, setResumeTarget] = React.useState<DutyResumeTarget | null>(null);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     let active = true;
@@ -67,7 +69,12 @@ export function HomeScreen({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { backgroundColor: online ? colors.successBg : colors.slate[100] }]}>
+      <View
+        style={[
+          styles.header,
+          { paddingTop: insets.top + spacing.md, backgroundColor: online ? colors.successBg : colors.slate[100] },
+        ]}
+      >
         <Pressable onPress={() => navigation.dispatch(DrawerActions.openDrawer())} hitSlop={8}>
           <Feather name="menu" size={24} color={colors.textPrimary} />
         </Pressable>
@@ -170,7 +177,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingTop: 56,
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.lg,
   },

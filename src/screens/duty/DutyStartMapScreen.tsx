@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
@@ -24,6 +25,7 @@ export function DutyStartMapScreen({ navigation }: Props) {
   const [odometerKm, setOdometerKm] = useState("");
   const [photoUri, setPhotoUri] = useState<string | undefined>();
   const canStart = !!odometerKm && !!photoUri;
+  const insets = useSafeAreaInsets();
 
   const onStart = async () => {
     if (!canStart || !photoUri) return;
@@ -41,7 +43,7 @@ export function DutyStartMapScreen({ navigation }: Props) {
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
+      <View style={[styles.header, { top: insets.top + spacing.md }]}>
         <Feather name="menu" size={24} color={colors.textPrimary} />
         <StatusToggle online={online} onToggle={() => {}} />
         <Feather name="bell" size={24} color={colors.textPrimary} />
@@ -93,7 +95,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   header: {
     position: "absolute",
-    top: 56,
     left: 0,
     right: 0,
     zIndex: 2,

@@ -1,5 +1,6 @@
 import React from "react";
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
@@ -27,12 +28,13 @@ export function PickupMapScreen({ navigation }: Props) {
   const online = useDutyStore((s) => s.online);
   const driverPosition = useLiveDriverPosition();
   const { route } = useDutyRoute("PICKUP");
+  const insets = useSafeAreaInsets();
 
   const remainingKm = route.routeAvailable ? remainingDistanceKm(route.geometry, driverPosition) : null;
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
+      <View style={[styles.header, { top: insets.top + spacing.md }]}>
         <TouchableOpacity onPress={() => navigation.navigate("Sos")}>
           <Feather name="alert-triangle" size={24} color={colors.error} />
         </TouchableOpacity>
@@ -74,7 +76,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   header: {
     position: "absolute",
-    top: 56,
     left: 0,
     right: 0,
     zIndex: 2,

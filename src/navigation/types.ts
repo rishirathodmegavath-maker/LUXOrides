@@ -68,6 +68,7 @@ export type HelpStackParamList = {
 };
 
 export type RootStackParamList = {
+  UpdateRequired: undefined;
   Auth: NavigatorScreenParams<AuthStackParamList>;
   Permissions: NavigatorScreenParams<PermissionsStackParamList>;
   Onboarding: NavigatorScreenParams<OnboardingStackParamList>;

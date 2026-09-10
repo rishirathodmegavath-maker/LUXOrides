@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { PermissionKind, PermissionsStackParamList } from "../../navigation/types";
 import { Button, ScreenContainer } from "../../components";
 import { useAuthStore } from "../../store/authStore";
+import { permissionsStorage } from "../../storage/permissionsStorage";
 import { requestNotificationPermissionAndRegister } from "../../services/notifications/pushNotifications";
 import { colors, spacing, type } from "../../theme";
 
@@ -62,12 +63,23 @@ export function PermissionScreen({ route, navigation }: Props) {
   const setPermissionsDone = useAuthStore((s) => s.setPermissionsDone);
   const [requesting, setRequesting] = useState(false);
 
+  // Reaching past the last screen in ORDER -- via Allow or Skip on each
+  // individual step, matching the existing "a denial never blocks
+  // onboarding" design above -- is what "the permission flow completed"
+  // means here: this in-memory flip plus the persisted write below both
+  // only ever happen once every step has actually been walked through, not
+  // merely because a screen opened or one step was granted/denied.
+  // Persistence is best-effort and fire-and-forget, matching this file's
+  // existing pattern for the notification-permission call: a write failure
+  // must never block the driver from proceeding into the app they already
+  // completed the wizard for, worst case the wizard reappears next launch.
   const goNext = () => {
     const idx = ORDER.indexOf(kind);
     if (idx < ORDER.length - 1) {
       navigation.replace("Permission", { kind: ORDER[idx + 1] });
     } else {
       setPermissionsDone(true);
+      permissionsStorage.setPermissionsDone().catch(() => {});
     }
   };
 

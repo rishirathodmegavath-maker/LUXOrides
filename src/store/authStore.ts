@@ -18,5 +18,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   setSession: (session) => set({ session }),
   setPermissionsDone: (permissionsDone) => set({ permissionsDone }),
   setApprovalStatus: (approvalStatus) => set({ approvalStatus }),
-  reset: () => set({ session: null, permissionsDone: false, approvalStatus: "pending" }),
+  // permissionsDone deliberately survives a reset -- it tracks whether this
+  // device completed the permission wizard, not whether a driver is
+  // logged in, so a logout/login cycle must not re-litigate it (it would
+  // also disagree with what's already persisted in permissionsStorage the
+  // moment the driver logs back in without an app restart in between).
+  reset: () => set({ session: null, approvalStatus: "pending" }),
 }));

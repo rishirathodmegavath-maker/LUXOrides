@@ -12,6 +12,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createNavigationContainerRef, NavigationContainer } from "@react-navigation/native";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { authService, dutyService } from "./src/services";
+import { permissionsStorage } from "./src/storage/permissionsStorage";
 import { useAuthStore } from "./src/store/authStore";
 import { useDutyStore } from "./src/store/dutyStore";
 import { colors } from "./src/theme";
@@ -78,6 +79,30 @@ export default function App() {
     };
   }, []);
 
+  // Loads the persisted "permission wizard completed" flag once at launch,
+  // purely locally (no network call), before RootNavigator ever mounts --
+  // gating the splash exactly like authReady does below, so there is no
+  // window where RootNavigator can decide "permissions" off the in-memory
+  // default (false) before this read resolves. Only ever flips the store to
+  // true here: the default is already false, and a storage read failure
+  // resolves to false (see permissionsStorage), which is the correct fail-
+  // safe outcome -- worst case the wizard shows again, never a false skip.
+  const [permissionsReady, setPermissionsReady] = useState(false);
+  useEffect(() => {
+    let active = true;
+    permissionsStorage
+      .getPermissionsDone()
+      .then((done) => {
+        if (active && done) useAuthStore.getState().setPermissionsDone(true);
+      })
+      .finally(() => {
+        if (active) setPermissionsReady(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   useEffect(() => {
     ensureAndroidNotificationChannel().catch(() => {});
   }, []);
@@ -110,16 +135,16 @@ export default function App() {
   }, []);
 
   const onLayoutRootView = useCallback(async () => {
-    if ((fontsLoaded || fontError) && authReady) {
+    if ((fontsLoaded || fontError) && authReady && permissionsReady) {
       await SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, fontError, authReady]);
+  }, [fontsLoaded, fontError, authReady, permissionsReady]);
 
   useEffect(() => {
     onLayoutRootView();
   }, [onLayoutRootView]);
 
-  if ((!fontsLoaded && !fontError) || !authReady) {
+  if ((!fontsLoaded && !fontError) || !authReady || !permissionsReady) {
     return null;
   }
 

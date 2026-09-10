@@ -12,6 +12,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createNavigationContainerRef, NavigationContainer } from "@react-navigation/native";
 import { RootNavigator } from "./src/navigation/RootNavigator";
 import { authService, dutyService } from "./src/services";
+import { loadVersionGateState } from "./src/util/versionGateBoot";
 import { permissionsStorage } from "./src/storage/permissionsStorage";
 import { useAuthStore } from "./src/store/authStore";
 import { useDutyStore } from "./src/store/dutyStore";
@@ -105,6 +106,17 @@ export default function App() {
 
   useEffect(() => {
     ensureAndroidNotificationChannel().catch(() => {});
+  }, []);
+
+  // Force-update gate, checked once at launch. Deliberately independent of
+  // authReady/the splash screen -- a slow or unreachable version endpoint
+  // must never delay app startup, only ever gate what's shown afterward
+  // (see RootNavigator). Resolved as one atomic write (see
+  // versionGateBoot.ts) so forceUpdateRequired and hadActiveDutyAtLaunch --
+  // read together by resolveRootStack -- can never be observed
+  // inconsistently between the two source reads settling at different times.
+  useEffect(() => {
+    loadVersionGateState().catch(() => {});
   }, []);
 
   // Registers the push token whenever a session becomes established --

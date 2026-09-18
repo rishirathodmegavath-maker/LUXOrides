@@ -1,13 +1,28 @@
-# LuxoRides Chauffeur App (Phase 1)
+# LuxoRides Chauffeur App
 
-Standalone React Native driver app for LuxoRides, built with Expo (TypeScript) from the
-[Figma design file](https://www.figma.com/design/chCkCwpDYO4NDcrs6li3sM). **Phase 1**: no
-backend, LuxoRides API, ORS, or payment gateway integration — everything runs against an
-isolated mock service layer designed to be swapped for real APIs without touching any screen
-or component code.
+React Native driver app for LuxoRides, built with Expo (TypeScript) from the
+[Figma design file](https://www.figma.com/design/chCkCwpDYO4NDcrs6li3sM).
+
+Auth, driver profile/session, onboarding, and the entire duty lifecycle (accept/decline,
+document upload/verification, pickup OTP, both arrival checkpoints, start/end with odometer
+capture, cash/QR payment, return-to-garage, close) are wired to the **real Fleetovo backend**
+-- see `src/services/index.ts`. The one remaining exception is support: FAQs are real static
+app copy, but live chat has no backend yet and is an honest static hand-off rather than a
+simulated conversation (see `LiveChatScreen`'s own comment).
 
 See [`docs/FIGMA_FIDELITY.md`](./docs/FIGMA_FIDELITY.md) for the full list of Figma details
 that could not be reproduced exactly, and why.
+
+## Configuration
+
+Copy `.env.example` to `.env` and fill in:
+
+- `EXPO_PUBLIC_API_BASE_URL` -- the backend's **LAN IP** (not `localhost`; a physical device
+  or emulator can't resolve your dev machine's localhost), e.g. `http://192.168.1.20:8443`.
+- `EXPO_PUBLIC_ORG_ID` -- the org id your local backend seeds for driver login (`demo` if you
+  ran the [backend's dev seeder](../fleetovo-core-service-main#run-locally)).
+
+Production builds never read this file -- see `src/config/env.ts` and `eas.json`.
 
 ## Running the app
 
@@ -24,26 +39,27 @@ npx expo prebuild
 # Run on a connected device/emulator (requires Android Studio/SDK, or Xcode on macOS):
 npx expo run:android
 npx expo run:ios
-
-# Or build installable binaries via EAS:
-npx eas build --platform android --profile development
 ```
 
 `npx expo start` alone will *not* work fully since the app uses native modules outside the
 Expo Go sandbox — use `run:android` / `run:ios` (or a custom dev client build) instead.
 
-### Verification run in this environment
+## Building an installable binary
 
-This sandbox has no Android SDK/emulator or Xcode, so on-device visual QA could not be done
-here. What *was* verified:
+Via EAS (requires an Expo account, `eas login`, and `eas env:create` for the `production`
+profile's environment variables -- see `eas.json` and `.env.example`):
 
-- `npx tsc --noEmit` — clean, zero errors.
-- `npx eslint src App.tsx` — clean, zero errors/warnings.
-- `npx expo export --platform android` — Metro bundles all 1584 modules with no errors.
-- `npx expo prebuild --platform android` — generates a valid native Android project.
+```bash
+npx eas build --platform android --profile development   # dev-client build, internal
+npx eas build --platform android --profile preview        # internal test build
+npx eas build --platform android --profile production     # store-ready, strips expo-dev-client
+```
 
-Run `npx expo run:android` (or `eas build`) on a machine with the Android SDK installed to do
-the final on-device pass.
+Or locally, once `expo prebuild` has generated `android/` and the Android SDK is installed:
+
+```bash
+cd android && ./gradlew assembleDebug
+```
 
 ## Project structure
 
@@ -54,10 +70,11 @@ src/
   components/    Shared UI kit (Button, TextField, OtpField, Dropdown, PhotoCapture,
                  SlideToConfirm, MapPreview, QrPaymentCard, …) — one implementation per
                  Figma component, reused across every screen that needs it.
-  services/      Mock backend. `types.ts` defines the domain interfaces (AuthService,
-                 OnboardingService, DutyService, PaymentService, SupportService); `mock/`
-                 implements each against in-memory data with simulated network latency.
-                 `services/index.ts` is the single place that wires interface -> implementation.
+  services/      `types.ts` defines the domain interfaces (AuthService, OnboardingService,
+                 DutyService, SupportService); `real/` implements Auth/Driver/Onboarding/Duty
+                 against the real Fleetovo backend, `mock/` still backs the FAQ/chat support
+                 surface. `services/index.ts` is the single place that wires interface ->
+                 implementation.
   store/         Zustand stores for session, onboarding progress, and active duty state.
   navigation/    Stack/tab/drawer navigators. `RootNavigator` gates which stack is mounted
                  off real app state (session / permissions / approval) — the standard
@@ -72,13 +89,14 @@ docs/
   FIGMA_FIDELITY.md  Discrepancy report.
 ```
 
-## Swapping in real backends later
+## Wiring up the remaining support/chat backend
 
 Every screen depends only on the interfaces in `src/services/types.ts`, obtained through
-`src/services/index.ts`. To wire up the real LuxoRides/Fleetovo backend in a later phase:
+`src/services/index.ts` -- the same pattern already used to swap Auth/Driver/Onboarding/Duty
+from mock to real. Support/chat is the one piece still pending a real backend:
 
-1. Write a new class implementing the relevant interface (e.g. `class ApiAuthService implements AuthService`) against the real HTTP API.
-2. Swap the instantiation in `src/services/index.ts` (`export const authService: AuthService = new ApiAuthService(...)`).
+1. Write a class implementing `SupportService` against the real HTTP API.
+2. Swap the instantiation in `src/services/index.ts`.
 3. Nothing in `src/screens` or `src/components` needs to change.
 
 The same applies to maps/ORS (replace `MapPreview` with a real map component) and payments

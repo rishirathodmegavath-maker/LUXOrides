@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { AuthStackParamList } from "../../navigation/types";
 import { Button, OtpField, ScreenContainer, ScreenHeader } from "../../components";
 import { authService } from "../../services";
+import { track } from "../../services/analytics";
 import { useAuthStore } from "../../store/authStore";
 import { colors, spacing, type } from "../../theme";
 
@@ -34,6 +35,7 @@ export function OtpScreen({ route, navigation }: Props) {
     setVerifying(true);
     try {
       const session = await authService.verifyOtp(phone, code);
+      track("login_success");
       setVerified(true);
       // Let the OtpField merge-into-checkmark animation play out before
       // RootNavigator switches stacks (it does so automatically once the
@@ -75,7 +77,7 @@ export function OtpScreen({ route, navigation }: Props) {
       )}
 
       <ScreenContainer padded={false} scroll={false} style={{ marginTop: spacing.xl }}>
-        <OtpField length={6} value={code} onChange={setCode} errorText={error} autoFocus success={verified} />
+        <OtpField length={6} value={code} onChange={setCode} errorText={error} autoFocus success={verified} testID="otp-code-input" />
       </ScreenContainer>
 
       {verified ? null : (

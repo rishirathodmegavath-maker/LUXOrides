@@ -21,6 +21,7 @@ export interface OtpFieldProps {
   // When true, plays a one-shot animation where all boxes converge into a
   // single checkmark badge at the center of the row.
   success?: boolean;
+  testID?: string;
 }
 
 const BOX = 52;
@@ -32,7 +33,7 @@ const BADGE_SIZE = 64;
 // is an original addition (not from Figma), ported from a standalone
 // reference (d:/LUXOrides/otp animation/Animated-otp-Verification) onto
 // this app's own teal/gold palette instead of that reference's dark theme.
-export function OtpField({ length = 6, value, onChange, errorText, autoFocus, success = false }: OtpFieldProps) {
+export function OtpField({ length = 6, value, onChange, errorText, autoFocus, success = false, testID }: OtpFieldProps) {
   const inputRef = useRef<TextInput>(null);
   const hasError = !!errorText;
   const digits = Array.from({ length }, (_, i) => value[i] ?? "");
@@ -100,6 +101,7 @@ export function OtpField({ length = 6, value, onChange, errorText, autoFocus, su
 
         <TextInput
           ref={inputRef}
+          testID={testID}
           value={value}
           onChangeText={(text) => onChange(text.replace(/[^0-9]/g, "").slice(0, length))}
           keyboardType="number-pad"

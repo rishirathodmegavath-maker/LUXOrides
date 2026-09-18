@@ -13,7 +13,13 @@ export function ScreenHeader({ onBack, title, right }: ScreenHeaderProps) {
   return (
     <View style={styles.row}>
       {onBack ? (
-        <Pressable style={styles.backRow} onPress={onBack} hitSlop={8}>
+        <Pressable
+          style={styles.backRow}
+          onPress={onBack}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+        >
           <Feather name="chevron-left" size={22} color={colors.textPrimary} />
           <Text style={styles.backLabel}>Back</Text>
         </Pressable>

@@ -55,18 +55,26 @@ export function QrPaymentCard({ qrCodeUrl, amount, paid }: QrPaymentCardProps) {
         {qrCodeUrl ? (
           <Image source={{ uri: qrCodeUrl }} style={styles.qrImage} resizeMode="contain" />
         ) : (
-          <Feather name="grid" size={140} color={colors.primary} />
+          <Feather name={paid ? "check-circle" : "grid"} size={140} color={paid ? colors.success : colors.primary} />
         )}
       </View>
-      <Text style={styles.qrCaption}>Ask the client to scan this QR code and complete the payment.</Text>
+      <Text style={styles.qrCaption}>
+        {paid
+          ? "This trip has already been paid for -- nothing left to collect."
+          : qrCodeUrl
+            ? "Ask the client to scan this QR code and complete the payment."
+            : "A payment QR isn't available for this trip right now."}
+      </Text>
 
-      <Button
-        label="Share QR Code"
-        variant="secondary"
-        leadingIcon={<Feather name="share" size={18} color={colors.primary} />}
-        onPress={onShare}
-        disabled={!qrCodeUrl}
-      />
+      {!paid ? (
+        <Button
+          label="Share QR Code"
+          variant="secondary"
+          leadingIcon={<Feather name="share" size={18} color={colors.primary} />}
+          onPress={onShare}
+          disabled={!qrCodeUrl}
+        />
+      ) : null}
     </View>
   );
 }

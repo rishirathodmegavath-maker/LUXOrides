@@ -7,7 +7,8 @@ import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { CompositeScreenProps } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../navigation/types";
-import { Button, Card, Chip, StatusToggle } from "../../components";
+import { Button, Card, Chip, InlineErrorBanner, StatusToggle } from "../../components";
+import { notificationApi } from "../../api/notification.api";
 import { driverService, dutyService } from "../../services";
 import { useDutyStore } from "../../store/dutyStore";
 import { reconcileActiveDuty, type DutyResumeTarget } from "../../util/resumeDuty";
@@ -38,30 +39,71 @@ export function HomeScreen({ navigation }: Props) {
   const setTodayDuty = useDutyStore((s) => s.setTodayDuty);
   const [driverName, setDriverName] = React.useState<string | null>(null);
   const [resumeTarget, setResumeTarget] = React.useState<DutyResumeTarget | null>(null);
+  // Both loads below used to swallow a failure entirely -- e.g. a real duty
+  // existing but getTodayDuty() rejecting looked identical to "no duty
+  // assigned yet", with no way for the driver to tell the difference or
+  // retry. loadError + reloadKey give the driver a real retry action instead
+  // of a permanently-stale/blank home screen.
+  const [loadError, setLoadError] = React.useState(false);
+  const [reloadKey, setReloadKey] = React.useState(0);
+  const [unreadCount, setUnreadCount] = React.useState(0);
   const insets = useSafeAreaInsets();
-
-  useEffect(() => {
-    let active = true;
-    driverService.getProfile().then((p) => active && setDriverName(p.name));
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
-      dutyService.getTodayDuty().then((d) => active && setTodayDuty(d));
+      notificationApi
+        .list()
+        .then((res) => active && setUnreadCount(res.unreadCount))
+        .catch(() => {
+          // Best-effort -- a failed unread-count fetch just means no badge shows, not a broken Home screen.
+        });
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
+
+  useEffect(() => {
+    let active = true;
+    driverService
+      .getProfile()
+      .then((p) => active && setDriverName(p.name))
+      .catch(() => active && setLoadError(true));
+    return () => {
+      active = false;
+    };
+  }, [reloadKey]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      dutyService
+        .getTodayDuty()
+        .then((d) => active && setTodayDuty(d))
+        .catch(() => active && setLoadError(true));
       // Reconciles any genuinely-started duty against the real backend
       // state (GET /driver/app/duties/{dutyId}) so an app restart mid-duty
       // routes back into the correct real screen instead of silently losing
       // it — see resumeDuty.ts.
-      reconcileActiveDuty().then((target) => active && setResumeTarget(target));
+      reconcileActiveDuty()
+        .then((target) => active && setResumeTarget(target))
+        .catch(() => active && setLoadError(true));
       return () => {
         active = false;
       };
-    }, [setTodayDuty])
+      // reloadKey isn't read in the body -- it's a deliberate re-run trigger
+      // so the Retry banner can force a refetch without leaving/re-focusing
+      // this screen, which is the only other thing that would normally
+      // re-invoke a useFocusEffect callback.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [setTodayDuty, reloadKey])
   );
+
+  const onRetryLoad = () => {
+    setLoadError(false);
+    setReloadKey((k) => k + 1);
+  };
 
   const onToggle = (next: boolean) => {
     setOnline(next);
@@ -75,14 +117,32 @@ export function HomeScreen({ navigation }: Props) {
           { paddingTop: insets.top + spacing.md, backgroundColor: online ? colors.successBg : colors.slate[100] },
         ]}
       >
-        <Pressable onPress={() => navigation.dispatch(DrawerActions.openDrawer())} hitSlop={8}>
+        <Pressable
+          onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Open menu"
+        >
           <Feather name="menu" size={24} color={colors.textPrimary} />
         </Pressable>
         <StatusToggle online={online} onToggle={onToggle} />
-        <Feather name="bell" size={24} color={colors.textPrimary} />
+        <Pressable
+          onPress={() => navigation.navigate("Notifications")}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+        >
+          <Feather name="bell" size={24} color={colors.textPrimary} />
+          {unreadCount > 0 ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{unreadCount > 9 ? "9+" : unreadCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
 
       <View style={styles.body}>
+        {loadError ? <InlineErrorBanner message="Couldn't load your latest duty." onRetry={onRetryLoad} /> : null}
         <Text style={styles.greeting}>{greeting()}{driverName ? `, ${driverName}` : ""}</Text>
         <Text style={styles.headline}>{online ? "You're Online" : "You're Offline"}</Text>
         <Text style={styles.subtitle}>
@@ -98,10 +158,11 @@ export function HomeScreen({ navigation }: Props) {
               </View>
               <Text style={styles.durationLabel}>{todayDuty.durationLabel}</Text>
             </View>
-            <Text style={styles.reportTime}>
-              {todayDuty.reportTime} <Text style={styles.reportSub}>AM</Text>
-            </Text>
-            <Text style={styles.reportBy}>Report by {todayDuty.reportTime} • in 30 mins</Text>
+            {/* reportTime already carries its own real am/pm marker
+                (toDutySummary formats it via toLocaleTimeString) -- no
+                second, hardcoded period label appended here. */}
+            <Text style={styles.reportTime}>{todayDuty.reportTime}</Text>
+            <Text style={styles.reportBy}>Report by {todayDuty.reportTime}</Text>
 
             <View style={styles.stopRow}>
               <View style={{ flex: 1 }}>
@@ -181,6 +242,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   body: { flex: 1, padding: spacing.lg },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.error,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  badgeText: { ...type.caption, fontSize: 10, lineHeight: 12, color: colors.textInverse },
   greeting: { ...type.body1, color: colors.textSecondary },
   headline: { ...type.h1, color: colors.textPrimary, marginTop: spacing.xxs },
   subtitle: { ...type.body1, color: colors.textSecondary, marginTop: spacing.xxs },
@@ -189,7 +263,6 @@ const styles = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.success },
   durationLabel: { ...type.body2, color: colors.textSecondary, textAlign: "right", marginLeft: spacing.sm, flexShrink: 0 },
   reportTime: { ...type.display, color: colors.textPrimary, marginTop: spacing.sm },
-  reportSub: { ...type.h4, color: colors.textSecondary },
   reportBy: { ...type.label, color: colors.success, marginTop: -4 },
   stopRow: { flexDirection: "row", marginTop: spacing.lg, gap: spacing.sm },
   stopLabel: { ...type.label, color: colors.success, letterSpacing: 0.5 },

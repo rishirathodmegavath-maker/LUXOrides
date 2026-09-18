@@ -19,6 +19,9 @@ export function StatusToggle({ online, onToggle }: StatusToggleProps) {
       <Pressable
         onPress={() => onToggle(!online)}
         style={[styles.track, online ? styles.trackOn : styles.trackOff]}
+        accessibilityRole="switch"
+        accessibilityLabel="Accepting duties"
+        accessibilityState={{ checked: online }}
       >
         <View style={[styles.thumb, online ? styles.thumbOn : styles.thumbOff]} />
       </Pressable>

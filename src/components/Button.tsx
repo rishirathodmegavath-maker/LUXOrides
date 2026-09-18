@@ -46,6 +46,16 @@ export function Button({
       testID={testID}
       onPress={onPress}
       disabled={isDisabled}
+      accessibilityRole="button"
+      // The label prop is always the accessible name, even while loading --
+      // without this, the loading state swaps the Text child for a bare
+      // ActivityIndicator, leaving screen readers with no name at all for
+      // exactly the state a driver most needs confirmation of ("did my tap
+      // register?"). accessibilityState.busy is the correct semantic for
+      // "in progress", distinct from disabled (which alone reads as
+      // permanently unavailable, not temporarily working).
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: isDisabled, busy: loading }}
       style={({ pressed }) => [
         styles.base,
         variant === "primary" && styles.primary,

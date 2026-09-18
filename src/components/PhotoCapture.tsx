@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import { colors, radius, spacing, type } from "../theme";
+import { compressPhoto } from "../util/imageCompression";
 
 export type CaptureStatus = "idle" | "uploading" | "verifying" | "verified" | "failed";
 
@@ -38,26 +39,41 @@ export function PhotoCapture({ uri, status, onCapture, label = "Tap to take a ph
   // while still letting a driver freely retake after "failed", or retake a
   // "verifying"/"verified" photo (neither is an in-flight request).
   const uploadInFlight = status === "uploading";
+  const [compressing, setCompressing] = useState(false);
 
+  // quality:1 here -- resolution is unaffected by this option either way,
+  // and re-encoding at a lower quality now would only compound with
+  // compressPhoto's own JPEG re-encode below for no benefit. All real
+  // size optimization (resize to a sane max dimension + single JPEG
+  // compress) happens once, in compressPhoto, not here.
   const pick = async () => {
-    if (uploadInFlight) {
+    if (uploadInFlight || compressing) {
       return;
     }
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     const result = permission.granted
-      ? await ImagePicker.launchCameraAsync({ quality: 0.7, aspect, allowsEditing: true })
-      : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, aspect, allowsEditing: true });
+      ? await ImagePicker.launchCameraAsync({ quality: 1, aspect, allowsEditing: true })
+      : await ImagePicker.launchImageLibraryAsync({ quality: 1, aspect, allowsEditing: true });
     if (!result.canceled && result.assets[0]) {
-      onCapture(result.assets[0].uri);
+      const asset = result.assets[0];
+      setCompressing(true);
+      try {
+        const uri = await compressPhoto({ uri: asset.uri, width: asset.width, height: asset.height });
+        onCapture(uri);
+      } finally {
+        setCompressing(false);
+      }
     }
   };
 
   return (
     <View>
       <Pressable
-        disabled={uploadInFlight}
+        disabled={uploadInFlight || compressing}
         style={[styles.frame, compact && styles.frameCompact, status === "failed" && styles.frameError]}
         onPress={pick}
+        accessibilityRole="button"
+        accessibilityLabel={compressing ? "Optimizing photo" : uri ? `${label}, photo captured. Tap to retake` : label}
       >
         {uri ? (
           <Image source={{ uri }} style={styles.image} resizeMode="cover" />
@@ -73,7 +89,11 @@ export function PhotoCapture({ uri, status, onCapture, label = "Tap to take a ph
           </View>
         ) : null}
       </Pressable>
-      {copy ? <Text style={[styles.status, { color: copy.color }]}>{copy.text}</Text> : null}
+      {compressing ? (
+        <Text style={[styles.status, { color: colors.info }]}>Optimizing photo…</Text>
+      ) : copy ? (
+        <Text style={[styles.status, { color: copy.color }]}>{copy.text}</Text>
+      ) : null}
       {status === "failed" && errorText ? <Text style={styles.error}>{errorText}</Text> : null}
     </View>
   );

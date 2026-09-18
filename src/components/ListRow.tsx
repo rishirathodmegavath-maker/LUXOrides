@@ -14,7 +14,12 @@ export interface ListRowProps {
 
 export function ListRow({ icon, title, subtitle, onPress, trailing, showChevron = true }: ListRowProps) {
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
+    >
       {icon ? <View style={styles.iconWrap}>{icon}</View> : null}
       <View style={styles.textWrap}>
         <Text style={styles.title}>{title}</Text>

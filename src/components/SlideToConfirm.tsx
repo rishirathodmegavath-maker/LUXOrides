@@ -63,12 +63,16 @@ export function SlideToConfirm({ label, onConfirm, disabled }: SlideToConfirmPro
 
 const styles = StyleSheet.create({
   track: {
-    height: 64,
+    // minHeight, not height: at large accessibility font sizes the label
+    // needs to wrap onto a second line -- a fixed height let it spill
+    // outside the pill-shaped track instead of the track growing to fit.
+    minHeight: 64,
     borderRadius: radius.pill,
     backgroundColor: colors.successBg,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 4,
+    paddingVertical: 8,
   },
   trackDisabled: { backgroundColor: colors.surfaceSunken },
   label: { ...type.button, color: colors.successStrong },

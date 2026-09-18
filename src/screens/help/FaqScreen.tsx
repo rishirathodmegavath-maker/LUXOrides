@@ -3,7 +3,7 @@ import { LayoutAnimation, Platform, Pressable, StyleSheet, Text, UIManager, View
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { HelpStackParamList } from "../../navigation/types";
-import { ScreenContainer, ScreenHeader } from "../../components";
+import { InlineErrorBanner, ScreenContainer, ScreenHeader } from "../../components";
 import { FaqItem, supportService } from "../../services";
 import { colors, radius, spacing, type } from "../../theme";
 
@@ -19,10 +19,23 @@ if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental
 export function FaqScreen({ navigation }: Props) {
   const [faqs, setFaqs] = useState<FaqItem[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    supportService.getFaqs().then(setFaqs);
-  }, []);
+    let active = true;
+    supportService
+      .getFaqs()
+      .then((f) => {
+        if (!active) return;
+        setFaqs(f);
+        setLoadError(false);
+      })
+      .catch(() => active && setLoadError(true));
+    return () => {
+      active = false;
+    };
+  }, [reloadKey]);
 
   const toggle = (id: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -32,10 +45,17 @@ export function FaqScreen({ navigation }: Props) {
   return (
     <ScreenContainer>
       <ScreenHeader onBack={() => navigation.goBack()} title="FAQs" />
+      {loadError ? <InlineErrorBanner message="Couldn't load FAQs." onRetry={() => setReloadKey((k) => k + 1)} /> : null}
       {faqs.map((faq) => {
         const open = openId === faq.id;
         return (
-          <Pressable key={faq.id} style={styles.box} onPress={() => toggle(faq.id)}>
+          <Pressable
+            key={faq.id}
+            style={styles.box}
+            onPress={() => toggle(faq.id)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: open }}
+          >
             <View style={styles.row}>
               <Text style={styles.question}>{faq.question}</Text>
               <Feather name={open ? "chevron-up" : "chevron-down"} size={18} color={colors.textSecondary} />

@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
 import { Button, ConsentCheckbox, Dropdown, IconCircle, ProgressBar, ScreenContainer, ScreenHeader, TextField } from "../../components";
 import { dutyService } from "../../services";
+import { track } from "../../services/analytics";
 import type { Cleanliness, FuelLevel, VehicleCondition } from "../../services/types";
 import { useDutyStore } from "../../store/dutyStore";
 import { colors, spacing, type } from "../../theme";
@@ -62,8 +63,11 @@ export function DutyReadinessSubmitScreen({ navigation }: Props) {
     setSubmitting(true);
     try {
       await dutyService.submitReadiness(checklist);
+      track("inspection_completed");
       setReadinessStatus("approved");
       navigation.navigate("DutyStartMap");
+    } catch (e) {
+      Alert.alert("Couldn't submit", e instanceof Error ? e.message : "Please try again.");
     } finally {
       setSubmitting(false);
     }

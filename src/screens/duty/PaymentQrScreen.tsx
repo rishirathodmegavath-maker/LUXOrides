@@ -1,14 +1,31 @@
 import React, { useEffect, useRef, useState } from "react";
-import { StyleSheet, Text } from "react-native";
+import { Linking, StyleSheet, Text, View } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
 import { Button, QrPaymentCard, ScreenContainer, ScreenHeader } from "../../components";
 import { dutyService } from "../../services";
+import { track } from "../../services/analytics";
 import { subscribeToDutyPaymentUpdates } from "../../services/realtime/dutyPaymentSocket";
 import { useDutyStore } from "../../store/dutyStore";
-import { colors, spacing, type } from "../../theme";
+import { SUPPORT_PHONE_TEL } from "../../constants/support";
+import { successHaptic } from "../../util/haptics";
+import { colors, radius, spacing, type } from "../../theme";
 
 const MANUAL_CHECK_COOLDOWN_MS = 5000;
+
+// The backend's own real QrPaymentStatusResponse.status values (see
+// com.core.gateway.razerpay.QrPaymentStatusResponse / RazorpayPaymentService.
+// isPaidByQR) -- EXPIRED/FAILED are genuine terminal states this gateway
+// returns, not invented client-side. There is no self-service "regenerate
+// QR" capability anywhere in this backend today (the QR is created once, as
+// part of endDuty), so the only honest recovery action for either is Call
+// Support -- inventing a regenerate button here would be UI for a capability
+// that doesn't exist.
+const BLOCKED_STATUSES = new Set(["EXPIRED", "FAILED"]);
+const BLOCKED_COPY: Record<string, string> = {
+  EXPIRED: "This payment QR code has expired.",
+  FAILED: "We couldn't generate a payment QR for this trip.",
+};
 
 type Props = NativeStackScreenProps<DutyStackParamList, "PaymentQr">;
 
@@ -31,6 +48,7 @@ export function PaymentQrScreen({ navigation }: Props) {
   const result = useDutyStore((s) => s.dutyEndResult);
   const executionToken = useDutyStore((s) => s.executionToken);
   const [paid, setPaid] = useState(false);
+  const [qrStatus, setQrStatus] = useState<string>("PENDING");
   const [amount, setAmount] = useState<number | null>(result?.amountToCollect ?? null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(result?.qrCodeUrl ?? null);
   const [checking, setChecking] = useState(false);
@@ -38,6 +56,8 @@ export function PaymentQrScreen({ navigation }: Props) {
   const [confirming, setConfirming] = useState(false);
   const lastCheckedAtRef = useRef(0);
   const confirmingRef = useRef(false);
+
+  const isBlocked = !paid && BLOCKED_STATUSES.has(qrStatus);
 
   // Initial load (covers the reconcileActiveDuty resume path, where only
   // executionToken survives a restart) plus every WebSocket push. A fresh
@@ -57,7 +77,12 @@ export function PaymentQrScreen({ navigation }: Props) {
         if (!active) return;
         if (status.amount != null) setAmount(status.amount);
         if (status.qrImageUrl) setQrCodeUrl(status.qrImageUrl);
-        if (status.paid) setPaid(true);
+        setQrStatus(status.status);
+        if (status.paid) {
+          setPaid(true);
+          track("payment_confirmed");
+          successHaptic();
+        }
         setError(null);
       } catch (e) {
         if (!active) return;
@@ -83,7 +108,9 @@ export function PaymentQrScreen({ navigation }: Props) {
   // lost, driver is still staring at the QR" — reuses the same status
   // fetch rather than adding a poll, and is itself rate-limited (disabled
   // while in flight, ignored within a cooldown window after the last check)
-  // so repeated taps can't turn into a request storm.
+  // so repeated taps can't turn into a request storm. Left enabled even
+  // while isBlocked -- a re-check is how the driver would ever discover
+  // ops resolved it (e.g. confirmed the payment through another channel).
   const onManualCheck = async () => {
     if (checking) return;
     if (Date.now() - lastCheckedAtRef.current < MANUAL_CHECK_COOLDOWN_MS) return;
@@ -93,7 +120,12 @@ export function PaymentQrScreen({ navigation }: Props) {
       const status = await dutyService.checkPaymentStatus();
       if (status.amount != null) setAmount(status.amount);
       if (status.qrImageUrl) setQrCodeUrl(status.qrImageUrl);
-      if (status.paid) setPaid(true);
+      setQrStatus(status.status);
+      if (status.paid) {
+        setPaid(true);
+        track("payment_confirmed");
+        successHaptic();
+      }
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't check payment status. Please try again.");
@@ -101,6 +133,10 @@ export function PaymentQrScreen({ navigation }: Props) {
       setChecking(false);
       lastCheckedAtRef.current = Date.now();
     }
+  };
+
+  const onCallSupport = () => {
+    Linking.openURL(SUPPORT_PHONE_TEL).catch(() => {});
   };
 
   // confirmingRef guards re-entrancy synchronously -- state alone isn't
@@ -118,7 +154,7 @@ export function PaymentQrScreen({ navigation }: Props) {
     <ScreenContainer
       footer={
         <Button
-          label={paid ? "Payment Received" : "Waiting for payment..."}
+          label={paid ? "Payment Received" : isBlocked ? "Payment unavailable" : "Waiting for payment..."}
           onPress={onContinue}
           disabled={!paid || confirming}
         />
@@ -129,6 +165,12 @@ export function PaymentQrScreen({ navigation }: Props) {
 
       {!paid ? (
         <>
+          {isBlocked ? (
+            <View style={styles.blockedBanner}>
+              <Text style={styles.blockedText}>{BLOCKED_COPY[qrStatus] ?? "This payment QR code isn't available."}</Text>
+              <Button label="Call Support" variant="secondary" onPress={onCallSupport} style={{ marginTop: spacing.sm }} />
+            </View>
+          ) : null}
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <Button
             label={checking ? "Checking..." : "Check payment status"}
@@ -145,4 +187,11 @@ export function PaymentQrScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   errorText: { ...type.body2, color: colors.error, marginTop: spacing.md, marginBottom: spacing.xs },
+  blockedBanner: {
+    backgroundColor: colors.errorBg,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.md,
+  },
+  blockedText: { ...type.body2, color: colors.error },
 });

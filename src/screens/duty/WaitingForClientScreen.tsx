@@ -31,7 +31,7 @@ export function WaitingForClientScreen({ navigation }: Props) {
       <Text style={styles.subtitle}>You&apos;ve arrived at the pickup point. Let your client know you&apos;re here.</Text>
       <Text style={styles.timer}>{mm}:{ss}</Text>
       {clientPhone ? (
-        <TouchableOpacity style={styles.callButton} onPress={() => Linking.openURL(`tel:${clientPhone}`)}>
+        <TouchableOpacity style={styles.callButton} onPress={() => Linking.openURL(`tel:${clientPhone}`)} accessibilityRole="button">
           <Feather name="phone-call" size={18} color={colors.primary} />
           <Text style={styles.callLabel}>Call Client</Text>
         </TouchableOpacity>

@@ -1,14 +1,19 @@
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import type { CompositeScreenProps } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { DutyStackParamList } from "../../navigation/types";
+import type { DutyStackParamList, RootStackParamList } from "../../navigation/types";
 import { Button, Card, ScreenContainer, ScreenHeader, StatusToggle } from "../../components";
+import { track } from "../../services/analytics";
 import type { FareBreakdown, ReturnRoute } from "../../services/types";
 import { useDutyStore } from "../../store/dutyStore";
 import { colors, spacing, type } from "../../theme";
 
-type Props = NativeStackScreenProps<DutyStackParamList, "PaymentBilling">;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<DutyStackParamList, "PaymentBilling">,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 function money(n: number) {
   return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
@@ -66,25 +71,53 @@ export function PaymentBillingScreen({ navigation }: Props) {
   const projectedTotalKm = result?.projectedTotalKm ?? null;
   const projectedTotalHrs = fare ? hrs(fare.projectedTotalDurationSeconds) : null;
 
+  // P0 safety gate (Phase 15): this screen is only ever reached with a real,
+  // just-computed backend result today (DropOffScreen's endDuty response) --
+  // but "Collect Online"/"Cash Received" must never be reachable without
+  // one regardless, since either button leads straight into collecting a
+  // payment. If dutyEndResult is ever missing (e.g. a future navigation path
+  // reaches this screen without it), never render an enabled path to
+  // payment collection against a fare the app cannot actually show.
+  const fareAvailable = result != null;
+
   return (
     <ScreenContainer
       footer={
-        <View style={{ flexDirection: "row", gap: spacing.sm }}>
-          <Button label="Cash Received" variant="secondary" style={{ flex: 1 }} onPress={() => navigation.navigate("CashPaymentReceived")} />
-          <Button label="Proceed to Payment" style={{ flex: 1 }} onPress={() => navigation.navigate("PaymentQr")} />
-        </View>
+        fareAvailable ? (
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <Button label="Cash Received" variant="secondary" style={{ flex: 1 }} onPress={() => navigation.navigate("CashPaymentReceived")} />
+            <Button
+              label="Collect Online"
+              style={{ flex: 1 }}
+              onPress={() => {
+                track("payment_started");
+                navigation.navigate("PaymentQr");
+              }}
+            />
+          </View>
+        ) : (
+          <Button label="Go back" variant="secondary" onPress={() => navigation.goBack()} />
+        )
       }
     >
       <View style={styles.header}>
         <Feather name="menu" size={24} color={colors.textPrimary} />
         <StatusToggle online={online} onToggle={() => {}} />
-        <Feather name="bell" size={24} color={colors.textPrimary} />
+        <Pressable onPress={() => navigation.navigate("Notifications")} hitSlop={8} accessibilityRole="button" accessibilityLabel="Notifications">
+          <Feather name="bell" size={24} color={colors.textPrimary} />
+        </Pressable>
       </View>
       <ScreenHeader onBack={() => navigation.goBack()} />
       <Text style={styles.title}>Final Fare</Text>
-      <Text style={styles.subtitle}>
-        Complete garage-to-garage fare, including the estimated return leg. This amount will not change from here.
-      </Text>
+      {fareAvailable ? (
+        <Text style={styles.subtitle}>
+          Complete garage-to-garage fare, including the estimated return leg. This amount will not change from here.
+        </Text>
+      ) : (
+        <Text style={styles.subtitle}>
+          Final fare unavailable. Go back and generate the bill again to see it.
+        </Text>
+      )}
 
       {result ? (
         <Card style={{ marginTop: spacing.xl }}>

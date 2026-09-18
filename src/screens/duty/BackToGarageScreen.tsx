@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import type { CompositeScreenProps } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { DutyStackParamList } from "../../navigation/types";
+import type { DutyStackParamList, RootStackParamList } from "../../navigation/types";
 import { Button, DutyMap, StatusToggle } from "../../components";
 import { dutyService } from "../../services";
 import { useDutyStore } from "../../store/dutyStore";
@@ -11,11 +12,17 @@ import { useLiveDriverPosition } from "../../hooks/useLiveDriverPosition";
 import { captureCurrentLocation } from "../../util/location";
 import { colors, radius, spacing, type } from "../../theme";
 
-type Props = NativeStackScreenProps<DutyStackParamList, "BackToGarage">;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<DutyStackParamList, "BackToGarage">,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
-// Mirrors the Figma "Back to Garage" frame (node 675:11124) — GPS
-// continues so the garage distance can be finalised, per the sitemap.
-// Phase 1: "Arrived at Garage" is a real, backend-persisted confirmation
+// Mirrors the Figma "Back to Garage" frame (node 675:11124). The fare
+// (including the drop->garage leg) is already computed and paid by this
+// point (ExternalDriverDutyService#submitEnd finalizes it using a real
+// routed estimate before the driver physically drives back) -- this screen
+// is an operational arrival checkpoint only, never a re-billing step.
+// "Arrived at Garage" is a real, backend-persisted confirmation
 // (ExternalDriverDutyController /return-garage), not a local-only step.
 export function BackToGarageScreen({ navigation }: Props) {
   const online = useDutyStore((s) => s.online);
@@ -46,13 +53,17 @@ export function BackToGarageScreen({ navigation }: Props) {
       <View style={[styles.header, { top: insets.top + spacing.md }]}>
         <Feather name="menu" size={24} color={colors.textPrimary} />
         <StatusToggle online={online} onToggle={() => {}} />
-        <Feather name="bell" size={24} color={colors.textPrimary} />
+        <Pressable onPress={() => navigation.navigate("Notifications")} hitSlop={8} accessibilityRole="button" accessibilityLabel="Notifications">
+          <Feather name="bell" size={24} color={colors.textPrimary} />
+        </Pressable>
       </View>
       <DutyMap driverPosition={driverPosition} style={{ flex: 1 }} />
       <View style={styles.sheet}>
         <View style={styles.handle} />
         <Text style={styles.title}>Returning to Garage</Text>
-        <Text style={styles.subtitle}>GPS tracking continues so your garage distance is finalised.</Text>
+        <Text style={styles.subtitle}>
+          The fare is already final — this just confirms you&apos;re back so the duty can be closed.
+        </Text>
         <Button label="Arrived at Garage" style={{ marginTop: spacing.lg }} onPress={onArrive} loading={confirming} />
       </View>
     </View>

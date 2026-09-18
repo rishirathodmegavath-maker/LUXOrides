@@ -29,7 +29,14 @@ export function DutyCompletionSlipScreen({ navigation }: Props) {
         <Text style={styles.rowValue}>Completed</Text>
       </Card>
 
-      <Pressable style={[styles.signatureBox, signed && styles.signatureBoxSigned]} onPress={() => setSigned(true)}>
+      <Pressable
+        style={[styles.signatureBox, signed && styles.signatureBoxSigned]}
+        onPress={() => setSigned(true)}
+        disabled={signed}
+        accessibilityRole="button"
+        accessibilityLabel={signed ? "Signed by client" : "Tap here for client to sign"}
+        accessibilityState={{ disabled: signed }}
+      >
         {signed ? (
           <>
             <Feather name="check-circle" size={28} color={colors.success} />

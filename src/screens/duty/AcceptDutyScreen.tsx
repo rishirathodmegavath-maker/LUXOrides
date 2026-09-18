@@ -3,8 +3,10 @@ import { Alert, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
-import { Button, Card, ScreenContainer, ScreenHeader } from "../../components";
+import { Button, Card, InlineErrorBanner, ScreenContainer, ScreenHeader } from "../../components";
 import { dutyService } from "../../services";
+import { track } from "../../services/analytics";
+import { successHaptic } from "../../util/haptics";
 import { useDutyStore } from "../../store/dutyStore";
 import { colors, spacing, type } from "../../theme";
 
@@ -19,10 +21,21 @@ export function AcceptDutyScreen({ navigation }: Props) {
   const todayDuty = useDutyStore((s) => s.todayDuty);
   const setTodayDuty = useDutyStore((s) => s.setTodayDuty);
   const [loading, setLoading] = useState(false);
+  // A driver with no cached todayDuty (e.g. a fresh push-notification
+  // launch) whose fetch failed used to be stuck on a near-blank screen
+  // forever, with no error and no way to work that day.
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!todayDuty) {
-      dutyService.getTodayDuty().then(setTodayDuty);
+      dutyService
+        .getTodayDuty()
+        .then((d) => {
+          setTodayDuty(d);
+          setLoadError(false);
+        })
+        .catch(() => setLoadError(true));
       return;
     }
     // Restart-resume gap fix: a duty accepted before the app was killed has
@@ -35,13 +48,15 @@ export function AcceptDutyScreen({ navigation }: Props) {
     if (todayDuty.driverAcceptedAt) {
       navigation.replace("UniformSelfie");
     }
-  }, [todayDuty, setTodayDuty, navigation]);
+  }, [todayDuty, setTodayDuty, navigation, reloadKey]);
 
   const onAccept = async () => {
     if (!todayDuty) return;
     setLoading(true);
     try {
       await dutyService.acceptDuty(todayDuty.id);
+      track("duty_accepted", { dutyId: todayDuty.id });
+      successHaptic();
       navigation.replace("UniformSelfie");
     } catch (e) {
       Alert.alert("Couldn't accept duty", e instanceof Error ? e.message : "Please try again.");
@@ -51,7 +66,14 @@ export function AcceptDutyScreen({ navigation }: Props) {
   };
 
   if (!todayDuty) {
-    return <ScreenContainer><ScreenHeader onBack={() => navigation.goBack()} /></ScreenContainer>;
+    return (
+      <ScreenContainer>
+        <ScreenHeader onBack={() => navigation.goBack()} />
+        {loadError ? (
+          <InlineErrorBanner message="Couldn't load this duty." onRetry={() => setReloadKey((k) => k + 1)} />
+        ) : null}
+      </ScreenContainer>
+    );
   }
 
   return (

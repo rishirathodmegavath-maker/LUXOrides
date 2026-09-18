@@ -4,6 +4,8 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
 import { Button, OtpField, ScreenContainer } from "../../components";
 import { dutyService } from "../../services";
+import { track } from "../../services/analytics";
+import { successHaptic } from "../../util/haptics";
 import { colors, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<DutyStackParamList, "PickupOtp">;
@@ -49,6 +51,8 @@ export function PickupOtpScreen({ navigation }: Props) {
     setError(undefined);
     try {
       await dutyService.verifyPickupOtp(code);
+      track("pickup_otp_verified");
+      successHaptic();
       navigation.navigate("DropOffMap");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't verify this code. Please try again.");
@@ -67,9 +71,15 @@ export function PickupOtpScreen({ navigation }: Props) {
       </Text>
       {sendError ? <Text style={styles.sendErrorText}>{sendError}</Text> : null}
       <ScreenContainer padded={false} scroll={false} style={{ marginTop: spacing.xl }}>
-        <OtpField length={6} value={code} onChange={setCode} errorText={error} autoFocus />
+        <OtpField length={6} value={code} onChange={setCode} errorText={error} autoFocus testID="pickup-otp-code-input" />
       </ScreenContainer>
-      <TouchableOpacity onPress={onResend} disabled={sendingOtp} style={styles.resendLink}>
+      <TouchableOpacity
+        onPress={onResend}
+        disabled={sendingOtp}
+        style={styles.resendLink}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: sendingOtp }}
+      >
         <Text style={styles.resendText}>{sendingOtp ? "Sending..." : "Resend code"}</Text>
       </TouchableOpacity>
     </ScreenContainer>

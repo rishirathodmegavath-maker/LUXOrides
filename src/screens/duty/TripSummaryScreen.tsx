@@ -16,7 +16,7 @@ export function TripSummaryScreen({ navigation }: Props) {
   const summary = useDutyStore((s) => s.dutyEndResult);
 
   return (
-    <ScreenContainer footer={<Button label="Proceed to Payment" onPress={() => navigation.navigate("PaymentBilling")} />}>
+    <ScreenContainer footer={<Button label="Collect the Payment" onPress={() => navigation.navigate("PaymentBilling")} />}>
       <ScreenHeader onBack={() => navigation.goBack()} title="Trip Summary" />
 
       <Card style={styles.card}>

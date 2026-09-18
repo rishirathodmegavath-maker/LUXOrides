@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
 import { Button, ScreenContainer } from "../../components";
 import { dutyService } from "../../services";
+import { track } from "../../services/analytics";
 import { colors, radius, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<DutyStackParamList, "ArrivedAtDropOff">;
@@ -15,8 +16,17 @@ export function ArrivedAtDropOffScreen({ navigation }: Props) {
 
   const onContinue = async () => {
     setLoading(true);
-    await dutyService.markArrivedAtDropoff();
-    navigation.navigate("DropOff");
+    try {
+      await dutyService.markArrivedAtDropoff();
+      track("drop_completed");
+      navigation.navigate("DropOff");
+    } catch (e) {
+      // Without this, a failure left `loading` true forever -- the button
+      // stuck on its spinner with no way to retry or navigate away.
+      Alert.alert("Couldn't continue", e instanceof Error ? e.message : "Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

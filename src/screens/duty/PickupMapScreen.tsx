@@ -2,16 +2,21 @@ import React from "react";
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import type { CompositeScreenProps } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { DutyStackParamList } from "../../navigation/types";
+import type { DutyStackParamList, RootStackParamList } from "../../navigation/types";
 import { Button, DutyMap, StatusToggle } from "../../components";
+import { dutyService } from "../../services";
 import { useDutyStore } from "../../store/dutyStore";
 import { useLiveDriverPosition } from "../../hooks/useLiveDriverPosition";
 import { useDutyRoute } from "../../hooks/useDutyRoute";
 import { remainingDistanceKm } from "../../util/routeDistance";
 import { colors, radius, spacing, type } from "../../theme";
 
-type Props = NativeStackScreenProps<DutyStackParamList, "PickupMap">;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<DutyStackParamList, "PickupMap">,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 function formatDuration(seconds: number): string {
   const minutes = Math.round(seconds / 60);
@@ -35,17 +40,23 @@ export function PickupMapScreen({ navigation }: Props) {
   return (
     <View style={styles.root}>
       <View style={[styles.header, { top: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.navigate("Sos")}>
+        <TouchableOpacity onPress={() => navigation.navigate("Sos")} accessibilityRole="button" accessibilityLabel="Emergency SOS">
           <Feather name="alert-triangle" size={24} color={colors.error} />
         </TouchableOpacity>
         <StatusToggle online={online} onToggle={() => {}} />
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
           {duty?.clientPhone ? (
-            <TouchableOpacity onPress={() => Linking.openURL(`tel:${duty.clientPhone}`)}>
+            <TouchableOpacity
+              onPress={() => Linking.openURL(`tel:${duty.clientPhone}`)}
+              accessibilityRole="button"
+              accessibilityLabel="Call client"
+            >
               <Feather name="phone-call" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           ) : null}
-          <Feather name="bell" size={24} color={colors.textPrimary} />
+          <TouchableOpacity onPress={() => navigation.navigate("Notifications")} accessibilityRole="button" accessibilityLabel="Notifications">
+            <Feather name="bell" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
         </View>
       </View>
       <DutyMap
@@ -63,8 +74,18 @@ export function PickupMapScreen({ navigation }: Props) {
           <Text style={styles.eta}>Distance/ETA not available</Text>
         )}
         <Text style={styles.address} numberOfLines={2}>{duty?.pickup.address}</Text>
-        <Button label="Arrived at Pickup" style={{ marginTop: spacing.lg }} onPress={() => navigation.navigate("WaitingForClient")} />
-        <TouchableOpacity style={styles.incidentLink} onPress={() => navigation.navigate("IncidentReport")}>
+        <Button
+          label="Arrived at Pickup"
+          style={{ marginTop: spacing.lg }}
+          onPress={() => {
+            // Fire-and-forget: this is a best-effort notification to the
+            // customer app, not a gate -- the driver must never wait on (or
+            // be blocked by) a network call just to reach the waiting screen.
+            dutyService.markArrivedAtPickup().catch(() => {});
+            navigation.navigate("WaitingForClient");
+          }}
+        />
+        <TouchableOpacity style={styles.incidentLink} onPress={() => navigation.navigate("IncidentReport")} accessibilityRole="button">
           <Text style={styles.incidentLinkText}>Report an issue</Text>
         </TouchableOpacity>
       </View>

@@ -6,6 +6,7 @@ import type { DutyStackParamList } from "../../navigation/types";
 import { Button, ScreenContainer } from "../../components";
 import { dutyService } from "../../services";
 import { captureCurrentLocation } from "../../util/location";
+import { warningHaptic } from "../../util/haptics";
 import { colors, radius, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<DutyStackParamList, "Sos">;
@@ -35,6 +36,7 @@ export function SosScreen({ navigation }: Props) {
     try {
       await dutyService.triggerSos(location);
       setSent(true);
+      warningHaptic();
     } catch {
       setError("Couldn't send SOS. Please try again or call for help directly.");
     } finally {

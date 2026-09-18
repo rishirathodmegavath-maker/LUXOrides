@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Linking, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import type { CompositeScreenProps } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { DutyStackParamList } from "../../navigation/types";
+import type { DutyStackParamList, RootStackParamList } from "../../navigation/types";
 import { Button, Chip, DutyMap, StatusToggle } from "../../components";
 import { useDutyStore } from "../../store/dutyStore";
 import { useLiveDriverPosition } from "../../hooks/useLiveDriverPosition";
@@ -11,7 +12,10 @@ import { useDutyRoute } from "../../hooks/useDutyRoute";
 import { remainingDistanceKm } from "../../util/routeDistance";
 import { colors, radius, spacing, type } from "../../theme";
 
-type Props = NativeStackScreenProps<DutyStackParamList, "DropOffMap">;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<DutyStackParamList, "DropOffMap">,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 function formatDuration(seconds: number): string {
   const minutes = Math.round(seconds / 60);
@@ -40,17 +44,23 @@ export function DropOffMapScreen({ navigation }: Props) {
   return (
     <View style={styles.root}>
       <View style={[styles.header, { top: insets.top + spacing.md }]}>
-        <TouchableOpacity onPress={() => navigation.navigate("Sos")}>
+        <TouchableOpacity onPress={() => navigation.navigate("Sos")} accessibilityRole="button" accessibilityLabel="Emergency SOS">
           <Feather name="alert-triangle" size={24} color={colors.error} />
         </TouchableOpacity>
         <StatusToggle online={online} onToggle={() => {}} />
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
           {duty?.clientPhone ? (
-            <TouchableOpacity onPress={() => Linking.openURL(`tel:${duty.clientPhone}`)}>
+            <TouchableOpacity
+              onPress={() => Linking.openURL(`tel:${duty.clientPhone}`)}
+              accessibilityRole="button"
+              accessibilityLabel="Call client"
+            >
               <Feather name="phone-call" size={24} color={colors.textPrimary} />
             </TouchableOpacity>
           ) : null}
-          <Feather name="bell" size={24} color={colors.textPrimary} />
+          <TouchableOpacity onPress={() => navigation.navigate("Notifications")} accessibilityRole="button" accessibilityLabel="Notifications">
+            <Feather name="bell" size={24} color={colors.textPrimary} />
+          </TouchableOpacity>
         </View>
       </View>
       <DutyMap
@@ -73,7 +83,7 @@ export function DropOffMapScreen({ navigation }: Props) {
         )}
         <Text style={styles.address} numberOfLines={2}>{duty?.dropoff.address}</Text>
         <Button label="Arrived at Drop-off" style={{ marginTop: spacing.lg }} onPress={() => navigation.navigate("ArrivedAtDropOff")} />
-        <TouchableOpacity style={styles.incidentLink} onPress={() => navigation.navigate("IncidentReport")}>
+        <TouchableOpacity style={styles.incidentLink} onPress={() => navigation.navigate("IncidentReport")} accessibilityRole="button">
           <Text style={styles.incidentLinkText}>Report an issue</Text>
         </TouchableOpacity>
       </View>

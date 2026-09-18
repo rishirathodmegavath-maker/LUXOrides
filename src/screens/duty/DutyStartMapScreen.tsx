@@ -1,17 +1,23 @@
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import type { CompositeScreenProps } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { DutyStackParamList } from "../../navigation/types";
+import type { DutyStackParamList, RootStackParamList } from "../../navigation/types";
 import { DutyMap, PhotoCapture, SlideToConfirm, StatusToggle, TextField } from "../../components";
 import { dutyService } from "../../services";
+import { track } from "../../services/analytics";
 import { useDutyStore } from "../../store/dutyStore";
 import { useLiveDriverPosition } from "../../hooks/useLiveDriverPosition";
+import { useOdometerOcrCheck } from "../../hooks/useOdometerOcrCheck";
 import { captureCurrentLocation } from "../../util/location";
 import { colors, radius, spacing, type } from "../../theme";
 
-type Props = NativeStackScreenProps<DutyStackParamList, "DutyStartMap">;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<DutyStackParamList, "DutyStartMap">,
+  NativeStackScreenProps<RootStackParamList>
+>;
 
 // Mirrors the Figma "Duty Start Map Page" frame (node 675:11826). The
 // odometer-km field and photo capture are an original addition — the real
@@ -26,6 +32,7 @@ export function DutyStartMapScreen({ navigation }: Props) {
   const [photoUri, setPhotoUri] = useState<string | undefined>();
   const canStart = !!odometerKm && !!photoUri;
   const insets = useSafeAreaInsets();
+  const odometerOcr = useOdometerOcrCheck(photoUri, odometerKm);
 
   const onStart = async () => {
     if (!canStart || !photoUri) return;
@@ -33,6 +40,7 @@ export function DutyStartMapScreen({ navigation }: Props) {
     try {
       const location = await captureCurrentLocation();
       await dutyService.startDuty({ odometerKm: Number(odometerKm), photoUri, location });
+      track("duty_started");
       navigation.navigate("PickupMap");
     } catch (e) {
       Alert.alert("Couldn't start duty", e instanceof Error ? e.message : "Please try again.");
@@ -46,7 +54,9 @@ export function DutyStartMapScreen({ navigation }: Props) {
       <View style={[styles.header, { top: insets.top + spacing.md }]}>
         <Feather name="menu" size={24} color={colors.textPrimary} />
         <StatusToggle online={online} onToggle={() => {}} />
-        <Feather name="bell" size={24} color={colors.textPrimary} />
+        <Pressable onPress={() => navigation.navigate("Notifications")} hitSlop={8} accessibilityRole="button" accessibilityLabel="Notifications">
+          <Feather name="bell" size={24} color={colors.textPrimary} />
+        </Pressable>
       </View>
       <DutyMap driverPosition={driverPosition} style={{ flex: 1 }} />
       <View style={styles.sheet}>
@@ -78,6 +88,17 @@ export function DutyStartMapScreen({ navigation }: Props) {
         <View style={{ marginTop: spacing.sm }}>
           <PhotoCapture uri={photoUri} status="idle" onCapture={setPhotoUri} label="Photo of odometer" compact />
         </View>
+        {odometerOcr.checking ? (
+          <Text style={styles.ocrHint}>Checking odometer photo…</Text>
+        ) : odometerOcr.mismatch ? (
+          <View style={styles.ocrWarning}>
+            <Feather name="alert-triangle" size={14} color={colors.warning} />
+            <Text style={styles.ocrWarningText}>
+              This doesn&apos;t match the reading in the photo
+              {odometerOcr.recognizedDigits ? ` (photo shows ${odometerOcr.recognizedDigits})` : ""}. Please double-check.
+            </Text>
+          </View>
+        ) : null}
 
         <View style={{ marginTop: spacing.lg }}>
           <SlideToConfirm
@@ -115,4 +136,7 @@ const styles = StyleSheet.create({
   stopRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm, marginBottom: spacing.sm },
   dotGreen: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.success, marginTop: 4 },
   address: { ...type.body1, color: colors.textPrimary, flex: 1 },
+  ocrHint: { ...type.body3, color: colors.textMuted, marginTop: spacing.sm },
+  ocrWarning: { flexDirection: "row", alignItems: "flex-start", gap: spacing.xs, marginTop: spacing.sm },
+  ocrWarningText: { ...type.body3, color: colors.warning, flex: 1 },
 });

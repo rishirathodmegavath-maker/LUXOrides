@@ -5,7 +5,9 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
 import { Button, ScreenContainer } from "../../components";
 import { dutyService } from "../../services";
+import { track } from "../../services/analytics";
 import { useDutyStore } from "../../store/dutyStore";
+import { successHaptic } from "../../util/haptics";
 import { colors, radius, spacing, type } from "../../theme";
 
 type Props = NativeStackScreenProps<DutyStackParamList, "CashPaymentReceived">;
@@ -57,6 +59,8 @@ export function CashPaymentReceivedScreen({ navigation }: Props) {
         }
         setConfirmedAmount(result.amount);
         setStatus("confirmed");
+        track("cash_confirmed");
+        successHaptic();
       } catch (e) {
         if (!active) return;
         setStatus("failed");

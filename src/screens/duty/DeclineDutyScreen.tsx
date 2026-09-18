@@ -13,8 +13,9 @@ const REASONS = ["Vehicle unavailable", "Personal emergency", "Health issue", "O
 
 // No Figma frame exists for this step either — the sitemap's "Chauffeur to
 // ask his ops team...to cancel duty" note describes the intent, not a
-// screen. Original content matching the app's design system, mock-only
-// (the real backend has no decline/cancel endpoint for drivers).
+// screen. Original content matching the app's design system. Phase 1: submits
+// to the real backend (POST /driver/app/duties/{dutyId}/decline via
+// FleetovoDutyService.declineDuty) — not mock.
 export function DeclineDutyScreen({ navigation }: Props) {
   const todayDuty = useDutyStore((s) => s.todayDuty);
   const resetDuty = useDutyStore((s) => s.resetDuty);

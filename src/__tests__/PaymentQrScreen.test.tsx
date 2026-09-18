@@ -94,6 +94,75 @@ describe("PaymentQrScreen", () => {
     expect(button.props.accessibilityState?.disabled ?? true).toBe(true);
   });
 
+  test("an EXPIRED QR shows a real, distinct message and a Call Support recovery action -- never a silent 'Waiting for payment'", async () => {
+    dutyService.checkPaymentStatus.mockResolvedValue({
+      paid: false,
+      status: "EXPIRED",
+      amount: 500,
+      qrImageUrl: null,
+      message: "QR code expired",
+    });
+
+    await renderScreen();
+
+    await waitFor(() => expect(screen.getByText("This payment QR code has expired.")).toBeTruthy());
+    expect(screen.getByText("Call Support")).toBeTruthy();
+    expect(screen.getByText("Payment unavailable")).toBeTruthy();
+    expect(screen.queryByText("Waiting for payment...")).toBeNull();
+  });
+
+  test("a FAILED QR shows a real, distinct message and a Call Support recovery action", async () => {
+    dutyService.checkPaymentStatus.mockResolvedValue({
+      paid: false,
+      status: "FAILED",
+      amount: 500,
+      qrImageUrl: null,
+      message: "QR code id is missing",
+    });
+
+    await renderScreen();
+
+    await waitFor(() => expect(screen.getByText("We couldn't generate a payment QR for this trip.")).toBeTruthy());
+    expect(screen.getByText("Call Support")).toBeTruthy();
+  });
+
+  test("EXPIRED never unlocks Payment Received, and Check payment status remains available to pick up a resolution", async () => {
+    dutyService.checkPaymentStatus.mockResolvedValue({
+      paid: false,
+      status: "EXPIRED",
+      amount: 500,
+      qrImageUrl: null,
+      message: "QR code expired",
+    });
+
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText("Payment unavailable")).toBeTruthy());
+
+    const button = screen.getByText("Payment unavailable");
+    expect(button.props.accessibilityState?.disabled ?? true).toBe(true);
+    expect(screen.getByText("Check payment status")).toBeTruthy();
+  });
+
+  test("a later re-check that finds the payment resolved unlocks Payment Received even after EXPIRED", async () => {
+    dutyService.checkPaymentStatus.mockResolvedValue({
+      paid: false,
+      status: "EXPIRED",
+      amount: 500,
+      qrImageUrl: null,
+      message: "QR code expired",
+    });
+    await renderScreen();
+    await waitFor(() => expect(screen.getByText("Payment unavailable")).toBeTruthy());
+
+    dutyService.checkPaymentStatus.mockResolvedValue({ paid: true, status: "PAID", amount: 500, qrImageUrl: null, message: "Payment received" });
+    await act(async () => {
+      mockLatestOnPaid?.();
+    });
+
+    await waitFor(() => expect(screen.getByText("Payment Received")).toBeTruthy());
+    expect(screen.queryByText("This payment QR code has expired.")).toBeNull();
+  });
+
   test("tapping Payment Received navigates exactly once even under a rapid double-tap", async () => {
     dutyService.checkPaymentStatus.mockResolvedValue({ paid: true, status: "PAID", amount: 500, qrImageUrl: null });
 

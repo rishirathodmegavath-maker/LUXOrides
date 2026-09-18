@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { DutyStackParamList } from "../../navigation/types";
 import { Button, DutyMap } from "../../components";
 import { dutyService } from "../../services";
+import { track } from "../../services/analytics";
 import { useDutyStore } from "../../store/dutyStore";
 import { useLiveDriverPosition } from "../../hooks/useLiveDriverPosition";
 import { remainingDistanceKm } from "../../util/routeDistance";
@@ -28,11 +29,13 @@ export function GarageMapScreen({ navigation }: Props) {
   const onConfirm = async () => {
     if (!arrived) {
       setArrived(true);
+      track("garage_reached");
       return;
     }
     setClosing(true);
     try {
       await dutyService.closeDuty();
+      track("duty_closed");
       navigation.navigate("DutyClosed");
     } catch (e) {
       Alert.alert("Couldn't close duty", e instanceof Error ? e.message : "Please try again.");

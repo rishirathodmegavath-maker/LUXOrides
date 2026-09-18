@@ -1,8 +1,11 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import * as Location from "expo-location";
 import { useDutyStore } from "../store/dutyStore";
+import { useGpsQualityStore } from "../store/gpsQualityStore";
 import { dutyApi } from "../api/duty.api";
 import { startBackgroundLocationTracking, stopBackgroundLocationTracking } from "../tasks/backgroundLocationTask";
+
+export type LocationReportingStatus = "inactive" | "active" | "foreground-only" | "denied";
 
 // Reports real GPS fixes to the backend's live-location channel while a duty
 // execution token is active and the duty hasn't ended yet. Independent of
@@ -16,10 +19,19 @@ import { startBackgroundLocationTracking, stopBackgroundLocationTracking } from 
 // unavailable/denied -- a driver who declines "Allow all the time" still
 // gets real reporting whenever the app is actually open, rather than none
 // at all. Never fabricates a fix either way.
-export function useDutyLocationReporter(): void {
+//
+// Returns the current status rather than staying void: a driver who granted
+// location during onboarding and later revoked it from OS Settings (or
+// whose OS auto-revoked an unused permission) previously had this fail
+// completely silently -- "best-effort, nothing more to do" -- with the only
+// visible symptom being a customer-side complaint about a frozen map dot.
+// Callers (see LocationPermissionBanner) can now surface "denied" as an
+// actionable prompt instead.
+export function useDutyLocationReporter(): LocationReportingStatus {
   const executionToken = useDutyStore((s) => s.executionToken);
   const dutyEndResult = useDutyStore((s) => s.dutyEndResult);
   const active = executionToken !== null && dutyEndResult === null;
+  const [status, setStatus] = useState<LocationReportingStatus>("inactive");
 
   useEffect(() => {
     let cancelled = false;
@@ -27,6 +39,7 @@ export function useDutyLocationReporter(): void {
 
     (async () => {
       if (!active || !executionToken) {
+        setStatus("inactive");
         // Defensive: also covers a background task left running from a
         // prior session (e.g. the app was killed before duty state could
         // be cleared normally) being stopped on the next mount.
@@ -35,16 +48,25 @@ export function useDutyLocationReporter(): void {
       }
 
       const result = await startBackgroundLocationTracking();
-      if (cancelled || result !== "foreground-only") {
-        // "granted": the background task now reports on its own.
-        // "denied": no location permission at all -- best-effort, nothing more to do.
+      if (cancelled) return;
+
+      if (result === "denied") {
+        setStatus("denied");
         return;
       }
 
+      if (result !== "foreground-only") {
+        // "granted": the background task now reports on its own.
+        setStatus("active");
+        return;
+      }
+
+      setStatus("foreground-only");
       try {
         foregroundSubscription = await Location.watchPositionAsync(
           { accuracy: Location.Accuracy.Balanced, timeInterval: 15000, distanceInterval: 25 },
           (pos) => {
+            useGpsQualityStore.getState().recordFix({ accuracyMeters: pos.coords.accuracy, capturedAtMs: pos.timestamp });
             dutyApi
               .reportLocation(executionToken, {
                 latitude: pos.coords.latitude,
@@ -61,6 +83,7 @@ export function useDutyLocationReporter(): void {
         );
       } catch {
         // Best-effort only -- e.g. permission denied mid-flow.
+        if (!cancelled) setStatus("denied");
       }
     })();
 
@@ -72,4 +95,6 @@ export function useDutyLocationReporter(): void {
       }
     };
   }, [active, executionToken]);
+
+  return status;
 }

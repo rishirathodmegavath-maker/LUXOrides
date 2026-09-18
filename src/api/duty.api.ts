@@ -16,6 +16,7 @@ import type {
   DriverDutySosResponse,
   DriverDutyStartRequest,
   DriverDutyStartResponse,
+  DriverDutyArrivalResponse,
   DriverDutySummaryResponse,
   DutyRouteLegResponse,
   DutySummaryForDriverDTO,
@@ -67,6 +68,13 @@ export const dutyApi = {
     );
   },
 
+  // Real distance/ETA for a duty leg, callable before any execution token
+  // exists (unlike the token-authenticated getRouteForLeg below) -- backs
+  // the pre-duty-start pickup/drop ETA shown on Home/DutyStartMap.
+  getRouteForDuty(dutyId: string, leg: "PICKUP" | "DROP" | "GARAGE"): Promise<DutyRouteLegResponse> {
+    return privateApi.get<DutyRouteLegResponse>(`/driver/app/duties/${dutyId}/route/${leg}`);
+  },
+
   // Token-authenticated duty execution API (no Bearer header — the token in
   // the path is the credential).
   getDutySummary(token: string): Promise<DriverDutySummaryResponse> {
@@ -107,6 +115,14 @@ export const dutyApi = {
 
   reportLocation(token: string, payload: DriverDutyLocationPingRequest): Promise<void> {
     return tokenApi.post<void>(`/driver-api/duty/${token}/location`, payload);
+  },
+
+  markArrivedAtPickup(token: string): Promise<DriverDutyArrivalResponse> {
+    return tokenApi.post<DriverDutyArrivalResponse>(`/driver-api/duty/${token}/arrived-at-pickup`);
+  },
+
+  markArrivedAtDropoff(token: string): Promise<DriverDutyArrivalResponse> {
+    return tokenApi.post<DriverDutyArrivalResponse>(`/driver-api/duty/${token}/arrived-at-dropoff`);
   },
 
   generatePickupOtp(token: string): Promise<PickupOtpGenerateResponse> {

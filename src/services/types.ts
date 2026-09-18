@@ -40,8 +40,22 @@ export interface DriverProfile {
   photoUrl?: string;
 }
 
+// One real, org-configured garage the driver can pick as their base/
+// departure location -- id is the real backend record's id (see
+// DriverGarageOption on the API layer); garageName/garageAddress are already
+// resolved to display strings so GarageLocationScreen doesn't need to know
+// the underlying AddressSnapshot shape.
+export interface GarageOption {
+  id: string;
+  garageName: string;
+  garageAddress: string;
+}
+
 export interface OnboardingService {
   saveProfileBasics(input: { name: string; email?: string; experienceYears?: number }): Promise<void>;
+  // Real garage options for the picker (never fabricated) -- empty array
+  // when the org hasn't configured any garages yet, not an error.
+  getGarageOptions(): Promise<GarageOption[]>;
   saveGarageLocation(input: { garageName: string; garageAddress: string }): Promise<void>;
   // expiryDate (ISO date string) is optional -- only meaningful for
   // documents that actually expire (e.g. a driving licence).
@@ -147,8 +161,30 @@ export interface DutyStartInput {
   location: DutyLocationInput;
 }
 
+// Mirrors com.core.models.enums.DriverDutyExpenseType (see
+// api/duty.types.ts's DriverDutyExpenseType, the wire-level twin of this
+// domain-level type -- same two-layer split VehicleCondition/Cleanliness/
+// FuelLevel already use elsewhere in this file).
+export type ExpenseCategory = "TOLL" | "PARKING" | "STATE_TAX" | "OTHER";
+
+// One driver-submitted, customer-billable duty expense (Final Fare + Expense
+// task). receiptUri is required, not optional: the real backend endpoint
+// (/driver-api/duty/{token}/end) accepts receipts as a single positionally-
+// aligned multipart list (receiptPhotos[i] belongs to extraCharges[i]) with
+// no way to represent "this expense has no receipt" without breaking that
+// alignment for every expense after it. Requiring a receipt for every entry
+// sidesteps that gap entirely -- see FleetovoDutyService.endDuty and the
+// task's own final report for why this wasn't instead a backend contract
+// change.
+export interface DutyExpenseEntry {
+  type: ExpenseCategory;
+  amount: number;
+  description?: string;
+  receiptUri: string;
+}
+
 export interface DutyEndInput extends DutyStartInput {
-  expenseAmount?: number;
+  expenses?: DutyExpenseEntry[];
 }
 
 export type IncidentCategory = "ACCIDENT" | "VEHICLE_BREAKDOWN" | "TRAFFIC_VIOLATION" | "CUSTOMER_DISPUTE" | "OTHER";
@@ -244,7 +280,6 @@ export interface DutyService {
   acceptDuty(dutyId: string): Promise<void>;
   declineDuty(dutyId: string, reason: string): Promise<void>;
   submitReadiness(checklist: ReadinessChecklist): Promise<void>;
-  getReadinessStatus(): Promise<"pending" | "submitted" | "approved">;
   // Odometer photo + GPS are what the real backend actually requires to
   // start/end a duty (see FleetovoDutyService) — the mock ignores the
   // detail and simulates the same outcome.
@@ -258,9 +293,15 @@ export interface DutyService {
   // client-side success condition for this step, the backend is the only
   // authority.
   verifyPickupOtp(code: string): Promise<void>;
+  // Real signal to the customer app / shared tracking link that the driver
+  // has reached the pickup point -- previously "Arrived at Pickup" was a
+  // purely local screen transition the customer had no way to learn about
+  // short of an actual phone call. Best-effort: a failure here must never
+  // block the driver from continuing to the waiting screen.
+  markArrivedAtPickup(): Promise<void>;
   markArrivedAtDropoff(): Promise<void>;
   endDuty(input: DutyEndInput): Promise<DutyEndResult>;
-  checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null }>;
+  checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null; message: string | null }>;
   // Records a real, backend-authoritative cash payment for the active duty --
   // no amount is passed in: the backend derives and validates the
   // outstanding payable amount itself (see FleetovoDutyService). Safe to

@@ -1,11 +1,11 @@
 import { dutyApi } from "../../api/duty.api";
-import type { AddressSnapshot, DriverDutyExpenseInput, DutySummaryForDriverDTO, PackageFareBreakdown } from "../../api/duty.types";
+import type { AddressSnapshot, DriverDutyExpenseInput, DutyRouteLegResponse, DutySummaryForDriverDTO, PackageFareBreakdown } from "../../api/duty.types";
 import type { FilePart } from "../../api/client";
+import { ApiError } from "../../api/errors";
 import { dutyStorage } from "../../storage/dutyStorage";
 import { assertOnline } from "../../util/network";
 import { useDutyStore } from "../../store/dutyStore";
-import { MockDutyService } from "../mock/mockDuty";
-import { CashPaymentResult, DutyEndInput, DutyEndResult, DutyLegRoute, DutyLocationInput, DutyRouteLeg, DutyService, DutyStartInput, DutySummary, FareBreakdown, IncidentReportInput, ReadinessChecklist, TripListItem } from "../types";
+import { CashPaymentResult, DutyEndInput, DutyEndResult, DutyLegRoute, DutyLocationInput, DutyRouteLeg, DutyService, DutyStartInput, DutySummary, FareBreakdown, IncidentReportInput, ReadinessChecklist, TripListItem, TripStop } from "../types";
 
 function money(dto: DutySummaryForDriverDTO): number | undefined {
   return dto.dutyTotal?.amount;
@@ -84,18 +84,46 @@ export function toDutySummary(dto: DutySummaryForDriverDTO): DutySummary {
   };
 }
 
-// Phase 1: accept/decline, pickup OTP, return-to-garage, and close-duty are
-// all now real, backend-authoritative calls (DriverAppController /
-// ExternalDriverDutyController) — only pre-duty readiness-status polling
-// (unused by the UI, submitReadiness itself is already real) and pickup-OTP
-// verification's UI plumbing still route through the mock's shape.
-export class FleetovoDutyService implements DutyService {
-  private mock = new MockDutyService();
+// Fills in real pickup/drop distance+ETA on top of toDutySummary's honest
+// nulls, via the real LocationService/provider chain (dutyApi.getRouteForDuty
+// -- no execution token needed, see ExternalDriverDutyService.getRouteForLeg's
+// BookingEntry overload). Best-effort and per-leg: a failed or genuinely
+// unavailable route (no garage location on file, provider outage, etc.)
+// leaves that leg's fields null rather than blocking the whole duty summary
+// or fabricating a number.
+async function enrichWithRouteEstimates(summary: DutySummary, dutyId: string): Promise<DutySummary> {
+  const [pickup, dropoff] = await Promise.all([
+    dutyApi.getRouteForDuty(dutyId, "PICKUP").catch(() => null),
+    dutyApi.getRouteForDuty(dutyId, "DROP").catch(() => null),
+  ]);
 
+  return {
+    ...summary,
+    pickup: mergeRouteEstimate(summary.pickup, pickup),
+    dropoff: mergeRouteEstimate(summary.dropoff, dropoff),
+  };
+}
+
+function mergeRouteEstimate(stop: TripStop, route: DutyRouteLegResponse | null): TripStop {
+  if (!route || !route.available || route.distanceKm == null) return stop;
+  return {
+    ...stop,
+    distanceKm: route.distanceKm,
+    etaMinutes: route.durationSeconds != null ? Math.round(route.durationSeconds / 60) : null,
+  };
+}
+
+// Accept/decline, readiness, pickup OTP, arrival (pickup + dropoff),
+// start/end, cash confirmation, return-to-garage, and close-duty are all
+// real, backend-authoritative calls (DriverAppController /
+// ExternalDriverDutyController) — nothing in this class delegates to the
+// mock anymore.
+export class FleetovoDutyService implements DutyService {
   async getTodayDuty(): Promise<DutySummary | null> {
     const page = await dutyApi.getActiveDuties();
     const first = page.content[0];
-    return first ? toDutySummary(first) : null;
+    if (!first) return null;
+    return enrichWithRouteEstimates(toDutySummary(first), first.dutyId);
   }
 
   async getTrips(): Promise<TripListItem[]> {
@@ -104,11 +132,21 @@ export class FleetovoDutyService implements DutyService {
   }
 
   async getTripById(id: string): Promise<TripListItem | null> {
+    // No longer swallows every failure into the same `null` -- that made a
+    // network/server error on this call indistinguishable from the trip
+    // genuinely not existing, so TripDetailsScreen could only ever show the
+    // same near-blank "not found"-looking screen either way, with no retry
+    // for the (more common) transient-failure case. A real 404 is the only
+    // case still mapped to `null`; everything else propagates so the screen
+    // can offer a real retry instead of a dead end.
     try {
       const dto = await dutyApi.getDuty(id);
       return toTripListItem(dto);
-    } catch {
-      return null;
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        return null;
+      }
+      throw e;
     }
   }
 
@@ -125,10 +163,12 @@ export class FleetovoDutyService implements DutyService {
   // Structured inspection submission (VehicleInspectionService,
   // /driver/app/duties/{dutyId}/inspection) -- the backend independently
   // enforces every condition rating, driverConfirmed, and all 8 photos, so
-  // this client-side check is a fast-fail, not the actual authority.
-  // readinessStatus itself stays driven by the mock (see submitReadiness's
-  // own store update in DutyReadinessSubmitScreen) -- there's no backend
-  // concept of an approval workflow for it yet.
+  // this client-side check is a fast-fail, not the actual authority. There's
+  // no backend concept of an approval workflow for readiness yet -- success
+  // here is the only signal; DutyReadinessSubmitScreen marks its own store
+  // state "approved" directly once this call resolves, and the
+  // interface/mock's separate getReadinessStatus() polling method was
+  // removed as dead code (zero call sites -- see the Driver App audit).
   async submitReadiness(checklist: ReadinessChecklist): Promise<void> {
     await assertOnline();
     const todayDuty = useDutyStore.getState().todayDuty;
@@ -192,10 +232,6 @@ export class FleetovoDutyService implements DutyService {
     );
   }
 
-  getReadinessStatus(): Promise<"pending" | "submitted" | "approved"> {
-    return this.mock.getReadinessStatus();
-  }
-
 // Odometer photo + GPS location are mandatory on the real endpoints
   // (ExternalDriverDutyController) — a duty must already be in the
   // driver's active list (getTodayDuty/getTrips) to have a real dutyId to
@@ -225,6 +261,17 @@ export class FleetovoDutyService implements DutyService {
     );
   }
 
+  // Best-effort: PickupMapScreen calls this and navigates on regardless of
+  // outcome (see its own comment) -- a driver must never be stuck on that
+  // screen just because this notification call failed.
+  async markArrivedAtPickup(): Promise<void> {
+    const token = useDutyStore.getState().executionToken;
+    if (!token) {
+      throw new Error("No active duty — cannot mark arrival before a duty has started.");
+    }
+    await dutyApi.markArrivedAtPickup(token);
+  }
+
   async requestPickupOtp(): Promise<void> {
     const token = useDutyStore.getState().executionToken;
     if (!token) {
@@ -242,8 +289,17 @@ export class FleetovoDutyService implements DutyService {
     await dutyApi.verifyPickupOtp(token, { otp: code });
   }
 
-  markArrivedAtDropoff(): Promise<void> {
-    return this.mock.markArrivedAtDropoff();
+  // Same real signal as markArrivedAtPickup above, for the other end of the
+  // trip -- unlike that one, ArrivedAtDropOffScreen surfaces a failure and
+  // keeps the driver on the screen to retry rather than navigating on
+  // regardless, so this blocks on connectivity up front for a clearer error.
+  async markArrivedAtDropoff(): Promise<void> {
+    await assertOnline();
+    const token = useDutyStore.getState().executionToken;
+    if (!token) {
+      throw new Error("No active duty — cannot mark arrival before a duty has started.");
+    }
+    await dutyApi.markArrivedAtDropoff(token);
   }
 
   async endDuty(input: DutyEndInput): Promise<DutyEndResult> {
@@ -252,10 +308,22 @@ export class FleetovoDutyService implements DutyService {
     if (!token) {
       throw new Error("Duty was never started — nothing to end.");
     }
-    const extraCharges: DriverDutyExpenseInput[] =
-      input.expenseAmount && input.expenseAmount > 0
-        ? [{ type: "OTHER", amount: input.expenseAmount, description: "Additional charges" }]
-        : [];
+    const expenses = input.expenses ?? [];
+    // extraCharges[i] and receiptPhotos[i] must stay positionally aligned --
+    // the real backend (persistDriverExpensesAndBillingCharges) reads
+    // receiptPhotos.get(i) for extraCharges.get(i) with no other correlation
+    // available. Every DutyExpenseEntry always carries a receiptUri (see its
+    // own type comment), so this alignment can never develop a gap.
+    const extraCharges: DriverDutyExpenseInput[] = expenses.map((expense) => ({
+      type: expense.type,
+      amount: expense.amount,
+      description: expense.description ?? null,
+    }));
+    const receiptPhotos: FilePart[] = expenses.map((expense, index) => ({
+      uri: expense.receiptUri,
+      name: `expense-receipt-${index + 1}.jpg`,
+      type: "image/jpeg",
+    }));
     const res = await dutyApi.submitEnd(
       token,
       {
@@ -265,7 +333,8 @@ export class FleetovoDutyService implements DutyService {
         locationCapturedAt: new Date().toISOString(),
         extraCharges,
       },
-      { uri: input.photoUri, name: "odometer-end.jpg", type: "image/jpeg" }
+      { uri: input.photoUri, name: "odometer-end.jpg", type: "image/jpeg" },
+      receiptPhotos.length > 0 ? receiptPhotos : undefined
     );
     const route = res.summary.returnRoute;
     return {
@@ -293,15 +362,19 @@ export class FleetovoDutyService implements DutyService {
     };
   }
 
-  async checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null }> {
+  async checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null; message: string | null }> {
     const token = useDutyStore.getState().executionToken;
-    if (!token) return { paid: false, status: "NOT_CREATED", amount: null, qrImageUrl: null };
+    if (!token) return { paid: false, status: "NOT_CREATED", amount: null, qrImageUrl: null, message: null };
     const res = await dutyApi.checkQrPaymentStatus(token);
     // amount/qrImageUrl let PaymentQrScreen render correctly even when it's
     // reached via reconcileActiveDuty's resume path, where no dutyEndResult
     // exists in the store (only the execution token was restored) — this
     // endpoint is the one place that still has them after a restart.
-    return { paid: res.paid, status: res.status, amount: res.amount, qrImageUrl: res.qrImageUrl };
+    // message is the backend's own real explanation (e.g. "QR code expired",
+    // "Waiting for payment") -- previously dropped here despite the backend
+    // already computing it, leaving PaymentQrScreen with no way to show a
+    // real EXPIRED/FAILED state as anything other than a silent PENDING.
+    return { paid: res.paid, status: res.status, amount: res.amount, qrImageUrl: res.qrImageUrl, message: res.message };
   }
 
   // P0 revenue-integrity fix -- previously MockPaymentService.confirmCashPayment

@@ -1,4 +1,5 @@
 import { dutyApi } from "../api/duty.api";
+import { ApiError } from "../api/errors";
 import { toDutySummary } from "../services/real/FleetovoDutyService";
 import { dutyStorage } from "../storage/dutyStorage";
 import { useDutyStore } from "../store/dutyStore";
@@ -27,12 +28,22 @@ export async function reconcileActiveDuty(): Promise<DutyResumeTarget | null> {
   let dto;
   try {
     dto = await dutyApi.getDuty(persisted.dutyId);
-  } catch {
-    // Duty no longer resolvable for this driver (reassigned, deleted, org
-    // mismatch, etc.) — the persisted reference is stale, drop it rather
-    // than keep retrying on every focus.
-    await dutyStorage.clearActiveDuty();
-    return null;
+  } catch (e) {
+    // Only a real 404 (DUTY_NOT_FOUND -- reassigned, deleted, org mismatch,
+    // or genuinely never existed) means the persisted reference is stale
+    // and safe to drop. Everything else -- a 401 from an expired JWT
+    // (session expiry is exactly what this function must survive), a
+    // network blip, a 5xx -- must NOT be treated the same way: this used
+    // to swallow every failure alike and permanently clear the driver's
+    // only pointer back to their real active duty, so a transient failure
+    // right when the driver returns from re-login could silently lose it
+    // for good. Propagate instead so the caller (HomeScreen) shows a
+    // retryable error and reconciliation is simply attempted again.
+    if (e instanceof ApiError && e.status === 404) {
+      await dutyStorage.clearActiveDuty();
+      return null;
+    }
+    throw e;
   }
 
   if (dto.status === "CANCELLED") {

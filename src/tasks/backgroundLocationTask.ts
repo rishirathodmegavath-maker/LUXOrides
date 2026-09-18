@@ -2,6 +2,7 @@ import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import { dutyApi } from "../api/duty.api";
 import { dutyStorage } from "../storage/dutyStorage";
+import { useGpsQualityStore } from "../store/gpsQualityStore";
 
 /*
  * Real background-capable location reporting for an active duty. Unlike
@@ -38,6 +39,8 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
     await stopBackgroundLocationTracking();
     return;
   }
+
+  useGpsQualityStore.getState().recordFix({ accuracyMeters: fix.coords.accuracy, capturedAtMs: fix.timestamp });
 
   try {
     await dutyApi.reportLocation(active.executionToken, {

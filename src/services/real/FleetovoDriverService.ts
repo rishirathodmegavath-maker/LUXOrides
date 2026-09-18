@@ -17,7 +17,10 @@ export class FleetovoDriverService implements DriverServiceApi {
       id: dto.id,
       name: displayName(dto.name) || "Driver",
       phone: dto.phone,
-      garageAddress: dto.address?.formattedAddress ?? undefined,
+      // Real, driver-editable fields now (see ProfileInfoScreen) -- distinct
+      // from dto.address, the driver's personal/residential address.
+      garageAddress: dto.garageLocation?.formattedAddress ?? undefined,
+      experienceYears: dto.experienceYears ?? undefined,
       // Real backend has no self-serve approval workflow for drivers (see
       // FleetovoAuthService) — a fetched driver is always an approved one.
       approvalStatus: "approved",

@@ -66,8 +66,6 @@ const TODAY_DUTY: DutySummary = {
 };
 
 export class MockDutyService implements DutyService {
-  private readiness: "pending" | "submitted" | "approved" = "pending";
-
   async getTodayDuty(): Promise<DutySummary | null> {
     return delay(TODAY_DUTY, 500);
   }
@@ -89,17 +87,15 @@ export class MockDutyService implements DutyService {
   }
 
   async submitReadiness(_checklist: ReadinessChecklist): Promise<void> {
-    this.readiness = "submitted";
     await delay(null, 900);
-    this.readiness = "approved";
-  }
-
-  async getReadinessStatus(): Promise<"pending" | "submitted" | "approved"> {
-    return delay(this.readiness, 200);
   }
 
   async startDuty(_input: DutyStartInput): Promise<void> {
     await delay(null, 500);
+  }
+
+  async markArrivedAtPickup(): Promise<void> {
+    await delay(null, 300);
   }
 
   async requestPickupOtp(): Promise<void> {
@@ -131,8 +127,8 @@ export class MockDutyService implements DutyService {
     );
   }
 
-  async checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null }> {
-    return delay({ paid: true, status: "PAID", amount: null, qrImageUrl: null }, 800);
+  async checkPaymentStatus(): Promise<{ paid: boolean; status: string; amount: number | null; qrImageUrl: string | null; message: string | null }> {
+    return delay({ paid: true, status: "PAID", amount: null, qrImageUrl: null, message: "Payment received" }, 800);
   }
 
   async confirmCashPayment(): Promise<CashPaymentResult> {

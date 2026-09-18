@@ -1,5 +1,15 @@
-import { DocumentStatus, DocumentType, DriverProfile, OnboardingService } from "../types";
+import { DocumentStatus, DocumentType, DriverProfile, GarageOption, OnboardingService } from "../types";
 import { delay } from "./utils";
+
+// Fake garage names only ever surfaced here, in the mock service used when
+// the app is deliberately running without a backend (see services/index.ts)
+// -- never in FleetovoOnboardingService, which fetches the real, org-
+// configured list.
+const MOCK_GARAGES: GarageOption[] = [
+  { id: "garage_delhi", garageName: "Garage Inc., New Delhi", garageAddress: "Garage Inc., New Delhi" },
+  { id: "garage_gurugram", garageName: "Garage Inc., Gurugram", garageAddress: "Garage Inc., Gurugram" },
+  { id: "garage_noida", garageName: "Garage Inc., Noida", garageAddress: "Garage Inc., Noida" },
+];
 
 export class MockOnboardingService implements OnboardingService {
   private statuses: Record<DocumentType, DocumentStatus> = {
@@ -11,6 +21,10 @@ export class MockOnboardingService implements OnboardingService {
 
   async saveProfileBasics(_input: { name: string; email?: string; experienceYears?: number }): Promise<void> {
     await delay(null, 500);
+  }
+
+  async getGarageOptions(): Promise<GarageOption[]> {
+    return delay(MOCK_GARAGES, 300);
   }
 
   async saveGarageLocation(_input: { garageName: string; garageAddress: string }): Promise<void> {

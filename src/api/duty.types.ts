@@ -90,7 +90,11 @@ export interface DriverDutyStartResponse {
   message: string | null;
 }
 
-export type DriverDutyExpenseType = "TOLL" | "PARKING" | "OTHER";
+// Mirrors com.core.models.enums.DriverDutyExpenseType exactly (verified
+// against DriverDutyExpense.java / DriverDutyExpenseInput.java on the
+// backend) -- STATE_TAX was previously missing here even though the backend
+// has always accepted it.
+export type DriverDutyExpenseType = "TOLL" | "PARKING" | "STATE_TAX" | "OTHER";
 
 export interface DriverDutyExpenseInput {
   type: DriverDutyExpenseType;
@@ -286,6 +290,12 @@ export interface PickupOtpVerifyRequest {
 export interface PickupOtpVerifyResponse {
   verified: boolean;
   verifiedAt: string | null;
+}
+
+// Mirrors com.core.dtos.driverduty.DriverDutyArrivalResponse.
+export interface DriverDutyArrivalResponse {
+  success: boolean;
+  arrivedAt: string | null;
 }
 
 // Mirrors com.core.dtos.driverduty.DriverDutyReturnGarageRequest / GarageReturnConfirmationResponse / CloseDutyConfirmationResponse.

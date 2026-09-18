@@ -16,14 +16,25 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, "ProfilePhoto">;
 export function ProfilePhotoScreen({ navigation }: Props) {
   const [uri, setUri] = useState<string>();
   const [status, setStatus] = useState<CaptureStatus>("idle");
+  const [uploadError, setUploadError] = useState<string>();
   const [submitted, setSubmitted] = useState(false);
   const setPhotoDone = useOnboardingStore((s) => s.setPhotoDone);
 
   const onCapture = async (pickedUri: string) => {
     setUri(pickedUri);
     setStatus("uploading");
-    const result = await onboardingService.uploadDocument("profilePhoto", pickedUri);
-    setStatus(result.status);
+    setUploadError(undefined);
+    try {
+      const result = await onboardingService.uploadDocument("profilePhoto", pickedUri);
+      setStatus(result.status);
+    } catch (e) {
+      // A network/server failure, distinct from a real verification
+      // rejection -- without this, `status` stayed "uploading" forever and
+      // PhotoCapture's frame stays permanently disabled with no way to
+      // retake the photo (uploadInFlight only clears on a settled status).
+      setUploadError(e instanceof Error ? e.message : "Upload failed. Check your connection and try again.");
+      setStatus("failed");
+    }
   };
 
   const onSubmit = () => {
@@ -49,7 +60,14 @@ export function ProfilePhotoScreen({ navigation }: Props) {
         status === "verified" ? (
           <Button label="Submit" onPress={onSubmit} />
         ) : status === "failed" ? (
-          <Button label="Redo & Resubmit" onPress={() => { setUri(undefined); setStatus("idle"); }} />
+          <Button
+            label="Redo & Resubmit"
+            onPress={() => {
+              setUri(undefined);
+              setStatus("idle");
+              setUploadError(undefined);
+            }}
+          />
         ) : (
           <Button label="Submit" disabled />
         )
@@ -64,7 +82,11 @@ export function ProfilePhotoScreen({ navigation }: Props) {
         onCapture={onCapture}
         aspect={[3, 4]}
         label="Tap to take a selfie"
-        errorText={status === "failed" ? "We couldn't verify this photo — make sure your face is clearly visible." : undefined}
+        errorText={
+          status === "failed"
+            ? (uploadError ?? "We couldn't verify this photo — make sure your face is clearly visible.")
+            : undefined
+        }
       />
     </ScreenContainer>
   );

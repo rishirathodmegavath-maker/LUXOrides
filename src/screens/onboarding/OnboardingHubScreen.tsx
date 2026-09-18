@@ -4,7 +4,7 @@ import { Feather } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { OnboardingStackParamList } from "../../navigation/types";
-import { ListRow, ScreenContainer, ScreenHeader, ProgressBar, IconCircle } from "../../components";
+import { InlineErrorBanner, ListRow, ScreenContainer, ScreenHeader, ProgressBar, IconCircle } from "../../components";
 import { onboardingService, DocumentStatus } from "../../services";
 import { useOnboardingStore } from "../../store/onboardingStore";
 import { colors, spacing, type } from "../../theme";
@@ -17,15 +17,25 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, "OnboardingHub">;
 export function OnboardingHubScreen({ navigation }: Props) {
   const [licence, setLicence] = useState<DocumentStatus>("idle");
   const [aadhaar, setAadhaar] = useState<DocumentStatus>("idle");
+  // A failure here used to leave both stuck at "idle" -- indistinguishable
+  // from genuinely not having started that step yet.
+  const [loadError, setLoadError] = useState(false);
   const garageDone = useOnboardingStore((s) => s.garageDone);
   const photoDone = useOnboardingStore((s) => s.photoDone);
 
-  useFocusEffect(
-    useCallback(() => {
-      onboardingService.getDocumentStatus("drivingLicence").then(setLicence);
-      onboardingService.getDocumentStatus("aadhaarCard").then(setAadhaar);
-    }, [])
-  );
+  const load = useCallback(() => {
+    setLoadError(false);
+    onboardingService
+      .getDocumentStatus("drivingLicence")
+      .then(setLicence)
+      .catch(() => setLoadError(true));
+    onboardingService
+      .getDocumentStatus("aadhaarCard")
+      .then(setAadhaar)
+      .catch(() => setLoadError(true));
+  }, []);
+
+  useFocusEffect(load);
 
   const completed = [licence === "verified", aadhaar === "verified", garageDone, photoDone].filter(Boolean).length;
   const allDone = completed === 4;
@@ -42,6 +52,8 @@ export function OnboardingHubScreen({ navigation }: Props) {
       <ScreenHeader onBack={() => navigation.goBack()} />
       <Text style={styles.title}>Welcome, Raja</Text>
       <Text style={styles.subtitle}>Complete four verification steps to start driving with Luxorides.</Text>
+
+      {loadError ? <InlineErrorBanner message="Couldn't load your verification status." onRetry={load} /> : null}
 
       <Text style={styles.progressLabel}>
         <Text style={styles.bold}>{completed}</Text> of <Text style={styles.bold}>4</Text> steps completed

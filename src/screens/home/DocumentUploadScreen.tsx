@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { StyleSheet, Text } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import type { OnboardingStackParamList } from "../../navigation/types";
+import type { RootStackParamList } from "../../navigation/types";
 import { Button, CaptureStatus, PhotoCapture, ScreenContainer, ScreenHeader, TextField } from "../../components";
 import { onboardingService } from "../../services";
 import { colors, spacing, type } from "../../theme";
 
-type Props = NativeStackScreenProps<OnboardingStackParamList, "DocUpload">;
+type Props = NativeStackScreenProps<RootStackParamList, "DocumentUpload">;
 
 const COPY = {
   drivingLicence: {
@@ -19,18 +19,16 @@ const COPY = {
   },
 };
 
-// Mirrors the Figma "Driving License Upload / Upload 3 / Success" (nodes
-// 671:9013, 671:9033, 671:9131) and "Aadhar Card Photo Upload / Upload 3 /
-// Error / Success" (671:9059, 671:9077, 671:9098, 671:9120) frames — one
-// dynamic screen driven by the real upload/verify status instead of four.
-// Driving licences are the one document type this app collects that
-// genuinely expires; Aadhaar has no expiry to capture here.
 const EXPIRY_APPLICABLE: Record<keyof typeof COPY, boolean> = {
   drivingLicence: true,
   aadhaarCard: false,
 };
 
-export function DocUploadScreen({ route, navigation }: Props) {
+// Same real upload/status flow as onboarding's DocUploadScreen, reached
+// instead from DocumentsScreen (Profile) -- once a driver is past
+// onboarding that stack is never mounted again, so a re-upload/re-check
+// after approval needs its own root-level route to the same real endpoint.
+export function DocumentUploadScreen({ route, navigation }: Props) {
   const { doc } = route.params;
   const copy = COPY[doc];
   const [uri, setUri] = useState<string>();
@@ -47,10 +45,6 @@ export function DocUploadScreen({ route, navigation }: Props) {
       const result = await onboardingService.uploadDocument(doc, pickedUri, isoExpiry);
       setStatus(result.status === "idle" ? "idle" : result.status);
     } catch (e) {
-      // A network/server failure, distinct from a real verification
-      // rejection -- without this, `status` stayed "uploading" forever and
-      // PhotoCapture's frame stays permanently disabled with no way to
-      // retake the photo (uploadInFlight only clears on a settled status).
       setUploadError(e instanceof Error ? e.message : "Upload failed. Check your connection and try again.");
       setStatus("failed");
     }
@@ -66,15 +60,11 @@ export function DocUploadScreen({ route, navigation }: Props) {
     <ScreenContainer
       footer={
         status === "verified" || status === "verifying" ? (
-          // Real submissions land as PENDING_REVIEW ("verifying") and stay
-          // there until an operations reviewer acts -- onboarding must not
-          // block the driver from continuing while that real review is
-          // pending, only "failed" (a genuine rejection) requires action here.
-          <Button label="Continue" onPress={() => navigation.navigate("OnboardingHub")} />
+          <Button label="Done" onPress={() => navigation.goBack()} />
         ) : status === "failed" ? (
           <Button label="Redo & Resubmit" onPress={onRetry} />
         ) : (
-          <Button label="Continue" disabled />
+          <Button label="Done" disabled />
         )
       }
     >

@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import type { CompositeScreenProps } from "@react-navigation/native";
 import type { BottomTabScreenProps } from "@react-navigation/bottom-tabs";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { MainTabParamList, RootStackParamList } from "../../navigation/types";
-import { Button, Card, ListRow } from "../../components";
+import { Button, Card, InlineErrorBanner, ListRow, ScreenContainer } from "../../components";
 import { authService, driverService, DriverProfile } from "../../services";
 import { useAuthStore } from "../../store/authStore";
 import { colors, radius, spacing, type } from "../../theme";
@@ -23,12 +22,24 @@ type Props = CompositeScreenProps<
 // reproduced from a Figma frame. Flagged in the fidelity report.
 export function ProfileScreen({ navigation }: Props) {
   const [profile, setProfile] = useState<DriverProfile | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const reset = useAuthStore((s) => s.reset);
-  const insets = useSafeAreaInsets();
 
   useEffect(() => {
-    driverService.getProfile().then(setProfile);
-  }, []);
+    let active = true;
+    driverService
+      .getProfile()
+      .then((p) => {
+        if (!active) return;
+        setProfile(p);
+        setLoadError(false);
+      })
+      .catch(() => active && setLoadError(true));
+    return () => {
+      active = false;
+    };
+  }, [reloadKey]);
 
   const onLogout = async () => {
     await authService.logout();
@@ -36,8 +47,15 @@ export function ProfileScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + spacing.md }]}>
+    <ScreenContainer footer={<Button label="Log Out" variant="secondary" onPress={onLogout} />}>
       <Text style={styles.title}>Profile</Text>
+
+      {loadError ? (
+        <InlineErrorBanner
+          message="Couldn't load your profile."
+          onRetry={() => setReloadKey((k) => k + 1)}
+        />
+      ) : null}
 
       <Card style={styles.identityCard}>
         <View style={styles.avatar}>
@@ -54,17 +72,31 @@ export function ProfileScreen({ navigation }: Props) {
       <View style={{ height: spacing.lg }} />
 
       <ListRow
+        icon={<Feather name="user" size={20} color={colors.textPrimary} />}
+        title="Profile Info"
+        subtitle="Personal details & documents"
+        onPress={() => navigation.navigate("ProfileInfo")}
+      />
+      <View style={{ height: spacing.xs }} />
+      <ListRow
         icon={<Feather name="home" size={20} color={colors.textPrimary} />}
         title="Garage"
-        subtitle={profile?.garageName ?? "—"}
-        showChevron={false}
+        subtitle={profile?.garageAddress ?? "Set your garage location"}
+        onPress={() => navigation.navigate("ProfileInfo")}
       />
       <View style={{ height: spacing.xs }} />
       <ListRow
         icon={<Feather name="briefcase" size={20} color={colors.textPrimary} />}
         title="Experience"
         subtitle={profile?.experienceYears ? `${profile.experienceYears} years` : "Not specified"}
-        showChevron={false}
+        onPress={() => navigation.navigate("ProfileInfo")}
+      />
+      <View style={{ height: spacing.xs }} />
+      <ListRow
+        icon={<Feather name="file-text" size={20} color={colors.textPrimary} />}
+        title="Documents"
+        subtitle="Driving Licence & Aadhaar verification"
+        onPress={() => navigation.navigate("Documents")}
       />
       <View style={{ height: spacing.xs }} />
       <ListRow
@@ -79,15 +111,18 @@ export function ProfileScreen({ navigation }: Props) {
         title="Help & Support"
         onPress={() => navigation.navigate("HelpStack", { screen: "Help" })}
       />
-
-      <View style={{ flex: 1 }} />
-      <Button label="Log Out" variant="secondary" onPress={onLogout} />
-    </View>
+      <View style={{ height: spacing.xs }} />
+      <ListRow
+        icon={<Feather name="shield" size={20} color={colors.textPrimary} />}
+        title="Policies & Legal"
+        subtitle="Terms, privacy and cancellation policies"
+        onPress={() => navigation.navigate("PoliciesLegal")}
+      />
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background, padding: spacing.lg },
   title: { ...type.h1, color: colors.textPrimary, marginBottom: spacing.lg },
   identityCard: { alignItems: "center" },
   avatar: {

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { StyleSheet, Text } from "react-native";
+import { Alert, StyleSheet, Text } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { OnboardingStackParamList } from "../../navigation/types";
 import { Button, ScreenContainer, ScreenHeader, TextField } from "../../components";
@@ -52,6 +52,8 @@ export function ProfileBasicsScreen({ navigation }: Props) {
         experienceYears: values.experience ? Number(values.experience) : undefined,
       });
       navigation.replace("OnboardingHub");
+    } catch (e) {
+      Alert.alert("Couldn't save", e instanceof Error ? e.message : "Please try again.");
     } finally {
       setSaving(false);
     }

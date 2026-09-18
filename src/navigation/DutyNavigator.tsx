@@ -26,38 +26,44 @@ import { SosScreen } from "../screens/duty/SosScreen";
 import { IncidentReportScreen } from "../screens/duty/IncidentReportScreen";
 import { IncidentReportConfirmationScreen } from "../screens/duty/IncidentReportConfirmationScreen";
 import { useDutyLocationReporter } from "../hooks/useDutyLocationReporter";
+import { useGpsQuality } from "../hooks/useGpsQuality";
+import { LocationPermissionBanner } from "../components";
 
 const Stack = createNativeStackNavigator<DutyStackParamList>();
 
 export function DutyNavigator() {
-  useDutyLocationReporter();
+  const locationStatus = useDutyLocationReporter();
+  const gpsQuality = useGpsQuality(locationStatus === "active" || locationStatus === "foreground-only");
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="AcceptDuty">
-      <Stack.Screen name="AcceptDuty" component={AcceptDutyScreen} />
-      <Stack.Screen name="DeclineDuty" component={DeclineDutyScreen} />
-      <Stack.Screen name="UniformSelfie" component={UniformSelfieScreen} />
-      <Stack.Screen name="VehicleExterior" component={VehicleExteriorScreen} />
-      <Stack.Screen name="VehicleInterior" component={VehicleInteriorScreen} />
-      <Stack.Screen name="DutyReadinessSubmit" component={DutyReadinessSubmitScreen} />
-      <Stack.Screen name="DutyStartMap" component={DutyStartMapScreen} />
-      <Stack.Screen name="PickupMap" component={PickupMapScreen} />
-      <Stack.Screen name="PickupOtp" component={PickupOtpScreen} />
-      <Stack.Screen name="WaitingForClient" component={WaitingForClientScreen} />
-      <Stack.Screen name="DropOffMap" component={DropOffMapScreen} />
-      <Stack.Screen name="DropOff" component={DropOffScreen} />
-      <Stack.Screen name="ArrivedAtDropOff" component={ArrivedAtDropOffScreen} />
-      <Stack.Screen name="TripSummary" component={TripSummaryScreen} />
-      <Stack.Screen name="PaymentBilling" component={PaymentBillingScreen} />
-      <Stack.Screen name="PaymentQr" component={PaymentQrScreen} />
-      <Stack.Screen name="CashPaymentReceived" component={CashPaymentReceivedScreen} />
-      <Stack.Screen name="DutyCompletionSlip" component={DutyCompletionSlipScreen} />
-      <Stack.Screen name="BackToGarage" component={BackToGarageScreen} />
-      <Stack.Screen name="GarageMap" component={GarageMapScreen} />
-      <Stack.Screen name="DutyClosed" component={DutyClosedScreen} />
-      <Stack.Screen name="Sos" component={SosScreen} />
-      <Stack.Screen name="IncidentReport" component={IncidentReportScreen} />
-      <Stack.Screen name="IncidentReportConfirmation" component={IncidentReportConfirmationScreen} />
-    </Stack.Navigator>
+    <>
+      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="AcceptDuty">
+        <Stack.Screen name="AcceptDuty" component={AcceptDutyScreen} />
+        <Stack.Screen name="DeclineDuty" component={DeclineDutyScreen} />
+        <Stack.Screen name="UniformSelfie" component={UniformSelfieScreen} />
+        <Stack.Screen name="VehicleExterior" component={VehicleExteriorScreen} />
+        <Stack.Screen name="VehicleInterior" component={VehicleInteriorScreen} />
+        <Stack.Screen name="DutyReadinessSubmit" component={DutyReadinessSubmitScreen} />
+        <Stack.Screen name="DutyStartMap" component={DutyStartMapScreen} />
+        <Stack.Screen name="PickupMap" component={PickupMapScreen} />
+        <Stack.Screen name="PickupOtp" component={PickupOtpScreen} />
+        <Stack.Screen name="WaitingForClient" component={WaitingForClientScreen} />
+        <Stack.Screen name="DropOffMap" component={DropOffMapScreen} />
+        <Stack.Screen name="DropOff" component={DropOffScreen} />
+        <Stack.Screen name="ArrivedAtDropOff" component={ArrivedAtDropOffScreen} />
+        <Stack.Screen name="TripSummary" component={TripSummaryScreen} />
+        <Stack.Screen name="PaymentBilling" component={PaymentBillingScreen} />
+        <Stack.Screen name="PaymentQr" component={PaymentQrScreen} />
+        <Stack.Screen name="CashPaymentReceived" component={CashPaymentReceivedScreen} />
+        <Stack.Screen name="DutyCompletionSlip" component={DutyCompletionSlipScreen} />
+        <Stack.Screen name="BackToGarage" component={BackToGarageScreen} />
+        <Stack.Screen name="GarageMap" component={GarageMapScreen} />
+        <Stack.Screen name="DutyClosed" component={DutyClosedScreen} />
+        <Stack.Screen name="Sos" component={SosScreen} />
+        <Stack.Screen name="IncidentReport" component={IncidentReportScreen} />
+        <Stack.Screen name="IncidentReportConfirmation" component={IncidentReportConfirmationScreen} />
+      </Stack.Navigator>
+      <LocationPermissionBanner status={locationStatus} quality={gpsQuality} />
+    </>
   );
 }

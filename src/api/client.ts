@@ -93,8 +93,9 @@ async function request<T>(path: string, init: RequestInit, authenticated: boolea
   return (await res.json()) as T;
 }
 
-/** For endpoints under the blanket-permitAll /auth/** prefix (no Bearer token yet). */
+/** For endpoints under the blanket-permitAll /auth/** and /public/** prefixes (no Bearer token). */
 export const publicApi = {
+  get: <T>(path: string) => coalescedGet<T>(path, false),
   post: <T>(path: string, body: unknown) => request<T>(path, { method: "POST", body: JSON.stringify(body) }, false),
 };
 
@@ -125,11 +126,68 @@ function buildMultipartForm(payload: unknown, files: Record<string, FilePart | F
   return form;
 }
 
+/*
+ * Phase B -- in-flight GET coalescing, NOT a result cache: if a GET is
+ * already in flight when an identical one is issued, the second call joins
+ * the first's Promise instead of firing a second network request. The map
+ * entry is removed the instant the shared request settles (success or
+ * failure), so a later GET for the same thing always hits the network
+ * fresh -- duty state changes too often for anything time-based here.
+ *
+ * Key = method + full path + auth context. Every current GET call site
+ * already bakes its parameters into the path itself via template literals
+ * (grep-verified: there is no separate query-string layer in this client),
+ * so the path alone is the complete semantic identity of the resource for
+ * every request this client makes today. Auth context is folded in
+ * separately because it is NOT part of the path for privateApi: the Bearer
+ * token (and the driver it identifies) is resolved from authStorage inside
+ * request(), not from the URL, so two different signed-in drivers hitting
+ * the same path (e.g. across a logout/login race with a request still in
+ * flight) would otherwise be able to share a Promise and one driver's
+ * in-flight response could be handed to another. Keying on the signed-in
+ * driverId (synchronously available from useAuthStore, not the raw token)
+ * makes that impossible by construction. tokenApi requests carry their own
+ * credential (the opaque duty token) directly in the path already, so they
+ * naturally get distinct keys without any extra auth component.
+ *
+ * JS's single-threaded, run-to-completion execution model means the
+ * check-then-set below needs no lock/atomic primitive (unlike
+ * RouteCacheService's JVM-side ConcurrentHashMap.putIfAbsent): no other
+ * call can interleave between reading inFlightGets and writing to it,
+ * because there is no `await` in between.
+ */
+const inFlightGets = new Map<string, Promise<unknown>>();
+
+function coalesceKey(path: string, authenticated: boolean): string {
+  if (!authenticated) {
+    return `GET public ${path}`;
+  }
+  const driverId = useAuthStore.getState().session?.driverId ?? "no-session";
+  return `GET auth:${driverId} ${path}`;
+}
+
+function coalescedGet<T>(path: string, authenticated: boolean): Promise<T> {
+  const key = coalesceKey(path, authenticated);
+
+  const existing = inFlightGets.get(key);
+  if (existing !== undefined) {
+    return existing as Promise<T>;
+  }
+
+  const tracked = request<T>(path, { method: "GET" }, authenticated).finally(() => {
+    inFlightGets.delete(key);
+  });
+  inFlightGets.set(key, tracked);
+  return tracked;
+}
+
 /** For endpoints requiring the driver's own Bearer JWT. */
 export const privateApi = {
-  get: <T>(path: string) => request<T>(path, { method: "GET" }, true),
+  get: <T>(path: string) => coalescedGet<T>(path, true),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined }, true),
+  put: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: "PUT", body: body !== undefined ? JSON.stringify(body) : undefined }, true),
   postMultipart: <T>(path: string, payload: unknown, files: Record<string, FilePart | FilePart[]>) =>
     request<T>(path, { method: "POST", body: buildMultipartForm(payload, files) }, true),
 };
@@ -140,7 +198,7 @@ export const privateApi = {
  * header (see ExternalDriverDutyController, permitAll + @CrossOrigin("*")).
  */
 export const tokenApi = {
-  get: <T>(path: string) => request<T>(path, { method: "GET" }, false),
+  get: <T>(path: string) => coalescedGet<T>(path, false),
   post: <T>(path: string, body?: unknown) =>
     request<T>(path, { method: "POST", body: body !== undefined ? JSON.stringify(body) : undefined }, false),
   postMultipart: <T>(path: string, payload: unknown, files: Record<string, FilePart | FilePart[]>) =>

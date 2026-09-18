@@ -11,6 +11,12 @@ import { MainDrawerNavigator } from "./MainDrawerNavigator";
 import { DutyNavigator } from "./DutyNavigator";
 import { HelpNavigator } from "./HelpNavigator";
 import { TripDetailsScreen } from "../screens/home/TripDetailsScreen";
+import { PoliciesLegalScreen } from "../screens/home/PoliciesLegalScreen";
+import { DocumentsScreen } from "../screens/home/DocumentsScreen";
+import { DocumentUploadScreen } from "../screens/home/DocumentUploadScreen";
+import { NotificationsScreen } from "../screens/home/NotificationsScreen";
+import { ProfileInfoScreen } from "../screens/home/ProfileInfoScreen";
+import { AboutScreen } from "../screens/home/AboutScreen";
 import { UpdateRequiredScreen } from "../screens/UpdateRequiredScreen";
 import { NetworkBanner } from "../components";
 import { useNetworkReconnectSync } from "../hooks/useNetworkReconnectSync";
@@ -72,6 +78,12 @@ export function RootNavigator() {
         <Stack.Screen name="Duty" component={DutyNavigator} />
         <Stack.Screen name="HelpStack" component={HelpNavigator} />
         <Stack.Screen name="TripDetails" component={TripDetailsScreen} />
+        <Stack.Screen name="PoliciesLegal" component={PoliciesLegalScreen} />
+        <Stack.Screen name="Documents" component={DocumentsScreen} />
+        <Stack.Screen name="DocumentUpload" component={DocumentUploadScreen} />
+        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+        <Stack.Screen name="ProfileInfo" component={ProfileInfoScreen} />
+        <Stack.Screen name="About" component={AboutScreen} />
       </Stack.Navigator>
     );
   }

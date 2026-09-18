@@ -76,6 +76,12 @@ export type RootStackParamList = {
   Duty: NavigatorScreenParams<DutyStackParamList>;
   HelpStack: NavigatorScreenParams<HelpStackParamList>;
   TripDetails: { dutyId: string };
+  PoliciesLegal: undefined;
+  Documents: undefined;
+  DocumentUpload: { doc: DocKind };
+  Notifications: undefined;
+  ProfileInfo: undefined;
+  About: undefined;
 };
 
 declare global {

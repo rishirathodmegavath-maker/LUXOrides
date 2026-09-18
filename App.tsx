@@ -11,7 +11,10 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { createNavigationContainerRef, NavigationContainer } from "@react-navigation/native";
 import { RootNavigator } from "./src/navigation/RootNavigator";
+import { ErrorBoundary } from "./src/components";
+import { Sentry } from "./src/config/sentry";
 import { authService, dutyService } from "./src/services";
+import { track } from "./src/services/analytics";
 import { loadVersionGateState } from "./src/util/versionGateBoot";
 import { permissionsStorage } from "./src/storage/permissionsStorage";
 import { useAuthStore } from "./src/store/authStore";
@@ -108,6 +111,10 @@ export default function App() {
     ensureAndroidNotificationChannel().catch(() => {});
   }, []);
 
+  useEffect(() => {
+    track("app_open");
+  }, []);
+
   // Force-update gate, checked once at launch. Deliberately independent of
   // authReady/the splash screen -- a slow or unreachable version endpoint
   // must never delay app startup, only ever gate what's shown afterward
@@ -129,6 +136,14 @@ export default function App() {
     if (session) {
       registerPushTokenIfPermitted();
     }
+  }, [session]);
+
+  // Ties crash reports to a driver id for support triage (see the earlier
+  // audit's example: "Driver 183 / Samsung S24 / ...") without ever sending
+  // phone number or name -- Sentry's user context is scoped to whatever
+  // fields are set here, and only driverId is set.
+  useEffect(() => {
+    Sentry.setUser(session ? { id: session.driverId } : null);
   }, [session]);
 
   // Foreground receipt: authoritative refetch only, never navigate -- the OS
@@ -163,39 +178,41 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <NavigationContainer
-          ref={navigationRef}
-          onReady={() => {
-            // App launched by tapping a notification (killed-app case) --
-            // handled once, exactly when navigation is actually ready to
-            // accept a navigate() call.
-            const response = Notifications.getLastNotificationResponse();
-            if (response) {
-              Notifications.clearLastNotificationResponse();
-              handleNotificationTap();
-            }
-          }}
-          theme={{
-            dark: false,
-            colors: {
-              primary: colors.primary,
-              background: colors.background,
-              card: colors.background,
-              text: colors.textPrimary,
-              border: colors.borderMuted,
-              notification: colors.error,
-            },
-            fonts: {
-              regular: { fontFamily: "Geist-Regular", fontWeight: "400" },
-              medium: { fontFamily: "Geist-Medium", fontWeight: "500" },
-              bold: { fontFamily: "Geist-Bold", fontWeight: "700" },
-              heavy: { fontFamily: "Geist-Black", fontWeight: "900" },
-            },
-          }}
-        >
-          <RootNavigator />
-          <StatusBar style="dark" />
-        </NavigationContainer>
+        <ErrorBoundary>
+          <NavigationContainer
+            ref={navigationRef}
+            onReady={() => {
+              // App launched by tapping a notification (killed-app case) --
+              // handled once, exactly when navigation is actually ready to
+              // accept a navigate() call.
+              const response = Notifications.getLastNotificationResponse();
+              if (response) {
+                Notifications.clearLastNotificationResponse();
+                handleNotificationTap();
+              }
+            }}
+            theme={{
+              dark: false,
+              colors: {
+                primary: colors.primary,
+                background: colors.background,
+                card: colors.background,
+                text: colors.textPrimary,
+                border: colors.borderMuted,
+                notification: colors.error,
+              },
+              fonts: {
+                regular: { fontFamily: "Geist-Regular", fontWeight: "400" },
+                medium: { fontFamily: "Geist-Medium", fontWeight: "500" },
+                bold: { fontFamily: "Geist-Bold", fontWeight: "700" },
+                heavy: { fontFamily: "Geist-Black", fontWeight: "900" },
+              },
+            }}
+          >
+            <RootNavigator />
+            <StatusBar style="dark" />
+          </NavigationContainer>
+        </ErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -71,7 +71,8 @@
       ],
       "expo-task-manager",
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      "@sentry/react-native"
     ],
     "extra": {
       "eas": {
